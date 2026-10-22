@@ -20,6 +20,7 @@ let trades=load(JOURNAL,[]);
 if(!Array.isArray(trades))trades=[];
 trades=trades.filter(x=>x&&typeof x.symbol==='string'&&/^[A-Z0-9]+-USDT$/.test(x.symbol));
 let latest=null,lastDataAt=0,busy=false,seenSignals=new Set(),hasBaseline=false,selectedCoin=null,toastTimer=0;
+let nearFilter='ALL';
 const filters={score:$('filterScore'),volume:$('filterVolume'),range:$('filterRange'),sort:$('sortBy')};
 for(const [k,el] of Object.entries(filters))if([...el.options].some(x=>x.value===String(prefs[k])))el.value=String(prefs[k]);
 const safeSymbol=s=>/^[A-Z0-9]+-USDT$/.test(s||'')?s:'';
@@ -73,6 +74,7 @@ function render(){
     .sort((a,b)=>(a.status==='BUY'?-1:0)-(b.status==='BUY'?-1:0)||b.score-a.score).slice(0,3);
   $('topPicks').innerHTML=top.length?top.map((c,i)=>`<button type="button" class="pick-card" data-open="${esc(c.symbol)}"><div class="pick-head"><span class="pick-rank">#0${i+1} · PRIORITY</span>${badge(c.status)}</div><div class="pick-symbol">${esc(c.symbol.split('-')[0])}<span class="muted"> / USDT</span></div><div class="pick-sub">$${price(c.price)}</div><div class="pick-stats"><div><small>24H CHANGE</small><strong class="${color(c.change24)}">${pc(c.change24)}</strong></div><div><small>REL. VOL</small><strong>${c.rvol||0}x</strong></div><div><small>RADAR SCORE</small><strong class="up">${c.score}/100</strong></div></div><div class="pick-footer"><span>${esc(c.setup||'Semak setup')}</span><span class="score-bubble">ANALYZE ↗</span></div></button>`).join(''):
     `<div class="pick-placeholder">${s.candleScanRunning?'Scan candle sedang berjalan...':'Belum ada setup teknikal mencukupi. Semak senarai di bawah.'}</div>`;
+  renderNear();
   const isOnline=latest.ok&&!s.dataStale;
   $('connectionPill').classList.toggle('offline',!isOnline);
   $('connectionLabel').textContent=isOnline?'LIVE DATA':'DATA OFFLINE';
@@ -81,6 +83,51 @@ function render(){
   $('journalBadge').textContent=trades.filter(t=>t.status==='OPEN').length;
   if(!q('#view-journal.hidden'))renderJournal();
 }
+function renderReadinessCard(c, i){
+  const r=c.readiness||{},near=r.level==='NEAR BUY',early=r.level==='EARLY';
+  const kind=near?'NEAR BUY':early?'EARLY MOMENTUM':'MONITOR SAHAJA';
+  const labelColor=near?'near-label-green':early?'near-label-blue':'near-label-grey';
+  const blockers=(r.pending||[]).slice(0,3).map(x=>`<li>${esc(x.detail||x.label)}</li>`).join('');
+  const more=Math.max(0,(r.pending||[]).length-3);
+  const gap=Number.isFinite(r.breakoutGapPct)?(r.breakoutGapPct>0?`Lagi ${pc(r.breakoutGapPct,false)} ke paras breakout`:'Breakout sudah lepasi paras rujukan'):'Jarak breakout tidak tersedia';
+  return `<button type="button" class="near-card" data-open="${esc(c.symbol)}" aria-label="Analisis ${esc(c.symbol)}; ${kind}">
+    <div class="near-card-head"><span class="near-kind ${labelColor}">${esc(kind)}</span><span class="near-readiness">${r.met||0}/${r.total||13} semakan</span></div>
+    <div class="near-card-top"><div><h3>${esc(c.symbol.split('-')[0])}<span> / USDT</span></h3><p>$${price(c.price)}</p></div><span class="near-score">${c.score||0}<small>/100</small></span></div>
+    <div class="near-progress" role="img" aria-label="${r.met||0} daripada ${r.total||13} kriteria lulus"><span style="width:${Math.max(0,Math.min(100,Number(r.percent)||0))}%"></span></div>
+    <div class="near-card-metrics"><div><small>REL. VOL</small><strong>${safeNum(c.rvol).toFixed(2)}x</strong></div><div><small>ADX</small><strong>${safeNum(c.adx).toFixed(1)}</strong></div><div><small>24H</small><strong class="${color(c.change24)}">${pc(c.change24)}</strong></div></div>
+    <div class="near-gap">${esc(gap)}</div>
+    <div class="near-blockers"><div>SYARAT BELUM LULUS</div><ul>${blockers||'<li>Tiada halangan direkodkan</li>'}</ul>${more?`<span class="near-more">+${more} lagi · buka analisis penuh</span>`:''}</div>
+    <div class="near-open">Lihat semua semakan <span>↗</span></div>
+  </button>`;
+}
+function renderNear(){
+  if(!latest)return;
+  if(!latest.ok||latest.summary?.dataStale){
+    $('nearCards').innerHTML='<div class="pick-placeholder">Data pasaran offline atau sudah lapuk. Calon momentum tidak dipaparkan sehingga data pulih.</div>';
+    $('nearCounter').textContent='Menunggu data yang segar';
+    $('nearTime').textContent='Data belum tersedia';
+    return;
+  }
+  const n=latest.nearBuy||[],e=latest.earlyMomentum||[],m=latest.monitorOnly||[];
+  $('nearCounter').innerHTML=`<span class="near-stat">NEAR BUY <b>${latest.summary?.nearCount??n.length}</b></span><span class="near-stat">EARLY MOMENTUM <b>${latest.summary?.earlyCount??e.length}</b></span><span class="near-stat">Calon dianalisis <b>${latest.summary?.analyzed||0}</b></span>`;
+  $('nearTime').textContent=latest.summary?.analyzedAt?'Scan teknikal: '+time(latest.summary.analyzedAt)+' MYT':'Menunggu scan';
+  const mixed=[...n.slice(0,4),...e.slice(0,4)];
+  const mixedSet=new Set(mixed.map(c=>c.symbol));
+  mixed.push(...[...n,...e].filter(c=>!mixedSet.has(c.symbol)).slice(0,8-mixed.length));
+  let shown=nearFilter==='NEAR BUY'?n:nearFilter==='EARLY'?e:mixed;
+  const fallback=nearFilter==='ALL'&&shown.length===0;
+  if(fallback)shown=m;
+  $('nearCards').innerHTML=shown.length?shown.slice(0,8).map(renderReadinessCard).join(''):
+    `<div class="pick-placeholder">${latest.summary?.candleScanRunning?'Scan sedang berjalan...':nearFilter==='ALL'?'Tiada calon segar. Semak sambungan dan data candle.':`Tiada ${nearFilter==='NEAR BUY'?'NEAR BUY':'EARLY MOMENTUM'} sekarang. Ini normal apabila syarat belum cukup.`}</div>`;
+  if(fallback&&m.length){
+    $('nearCards').insertAdjacentHTML('afterbegin','<div class="near-explainer">Belum ada NEAR BUY atau EARLY MOMENTUM. Berikut ialah calon <b>MONITOR SAHAJA</b> yang paling hampir — bukan signal entry.</div>');
+  }
+}
+qa('[data-near-filter]').forEach(b=>b.addEventListener('click',()=>{
+  nearFilter=b.dataset.nearFilter;
+  qa('[data-near-filter]').forEach(x=>x.classList.toggle('selected',x.dataset.nearFilter===nearFilter));
+  renderNear();
+}));
 function renderTradePreview(){
   const el=$('paperTradePreview');if(!el)return;
   const entry=Number($('journalEntry')?.value),fee=Number($('journalFee')?.value);
@@ -103,6 +150,8 @@ function openDrawer(sym){
   const reasons=(c.reasons||[]).slice(0,9).map(x=>`<p>• ${esc(x)}</p>`).join('')||'<p>Tiada halangan utama direkodkan.</p>';
   const delta=c.entryDistancePct;
   const deltaText=Number.isFinite(delta)?pc(delta):'—';
+  const readiness=c.readiness||{checks:[],pending:[],met:0,total:13,level:'NONE'};
+  const checksHtml=(readiness.checks||[]).map(k=>`<div class="readiness-check ${k.ok?'passed':'missing'}"><span>${k.ok?'✓':'○'}</span><span>${esc(k.label)}</span></div>`).join('');
   const warning=c.status==='BUY'
     ?'<div class="trade-guidance ready">BUY disahkan pada candle tertutup; semak harga, spread dan order book sebelum sebarang entry.</div>'
     :`<div class="trade-guidance">${c.status==='WATCH'?'WATCH — setup belum mengesahkan BUY.':'WAIT — tiada setup BUY yang sah.'} Paper trade di bawah ialah rekod latihan manual sahaja.</div>`;
@@ -118,6 +167,7 @@ function openDrawer(sym){
       <div class="detail-item"><small>RUJUKAN CANDLE †</small><strong>${c.entry?'$'+price(c.entry):'—'}</strong></div><div class="detail-item"><small>STOP −2% KASAR †</small><strong class="down">${c.entry?'$'+price(c.sl):'—'}</strong></div>
       <div class="detail-item"><small>LIVE vs CANDLE</small><strong class="${delta>=0?'up':'down'}">${deltaText}</strong></div><div class="detail-item"><small>ZON HARGA UNTUK SIGNAL BUY</small><strong>${c.entryZoneLow?'$'+price(c.entryZoneLow)+' – $'+price(c.entryZoneHigh):'—'}</strong></div>
     </div><div class="form-hint">† Paras rujukan daripada close candle 15m terakhir; ini BUKAN harga entry sebenar dan TP di atas belum ditolak fee. Zon entry ialah filter anti-chase, bukan pesanan beli. Harga live: $${price(c.price)}.</div>
+    <div class="readiness-detail"><h3>13 pemeriksaan BUY · ${readiness.met}/${readiness.total} lulus</h3><p>${c.status==='BUY'?'BUY disahkan pada candle yang telah tutup. Tetap semak spread dan risiko.':'Ini hanya tahap kesiapsiagaan teknikal, BUKAN signal BUY atau kebarangkalian menang.'}</p><div class="readiness-check-grid">${checksHtml||'<span class="muted">Tidak cukup data candle untuk analisis.</span>'}</div></div>
     <div class="detail-reasons"><h3>${esc(c.setup||'Analisis')} · Sebab belum BUY</h3>${reasons}</div>
     <div class="detail-actions"><a href="https://www.kucoin.com/trade/${encodeURIComponent(sym)}" target="_blank" rel="noopener noreferrer">Open KuCoin ↗</a><a href="https://www.tradingview.com/chart/?symbol=KUCOIN%3A${encodeURIComponent(sym.replace('-',''))}" target="_blank" rel="noopener noreferrer">TradingView ↗</a></div>
     <form id="paperForm" class="form-card"><h3>+ Rekod Paper Trade</h3><p>Entry manual sahaja — tiada order dihantar ke exchange.</p><div class="form-fields"><label>Entry Price (USDT)<input id="journalEntry" type="number" step="any" min="0.000000001" required value="${safeNum(c.price)}"></label><label>Position Size (USDT)<input id="journalSize" type="number" min="1" step="any" required value="100"></label><label>Fee setiap side (%)<input id="journalFee" type="number" min="0" max="5" step="0.01" required value="0.1"></label><label>Note (optional)<input id="journalNote" type="text" maxlength="120" placeholder="Setup / sebab masuk"></label></div>

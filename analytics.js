@@ -87,7 +87,7 @@ const pct = (a,b) => b>0?(a/b-1)*100:0;
 export function analyze(t, candles15, candles1h, now=Date.now()) {
   const base={...t,score:0,status:'WAIT',reasons:[],confirmed:false,lastCandle:null,
     entry:0,tp1:0,tp2:0,sl:0,rvol:0,rsi:0,adx:0,roc45:0,ema20:0,ema50:0,
-    trend1h:false,breakout:false,spark:[],setup:'Belum cukup data candle'};
+    trend15:false,trend1h:false,breakout:false,breakoutLevel:0,spark:[],setup:'Belum cukup data candle'};
   if(candles15.length<205||candles1h.length<56)return base;
   const c=candles15, h=candles1h, closes=c.map(x=>x.close), hc=h.map(x=>x.close);
   const cur=c.at(-1), prev=c.at(-2);
@@ -144,7 +144,7 @@ export function analyze(t, candles15, candles1h, now=Date.now()) {
   return {...base,score,status,reasons,confirmed:fresh,lastCandle:cur.time,
     entry,tp1:entry*(1+CFG.TP1/100),tp2:entry*(1+CFG.TP2/100),sl:entry*(1-CFG.SL/100),
     rvol:round(RVOL),rsi:round(R,1),adx:round(D,1),roc45:round(roc45),ema20:E20,ema50:E50,
-    trend1h,breakout:isBreakout,spark:c.slice(-35).map(x=>round(x.close,8)),
+    trend15,trend1h,breakout:isBreakout,breakoutLevel:prevHigh*1.001,spark:c.slice(-35).map(x=>round(x.close,8)),
     setup:buy?'Breakout disahkan + trend 15m/1h':status==='WATCH'?'Momentum dipantau':'Belum penuhi syarat BUY',
     stretch:round(stretch),time:now};
 }
@@ -165,4 +165,43 @@ export function chooseCandidates(tickers, max=CFG.MAX_CANDIDATES, rotation=0) {
     const t=remainder[(rotation+i)%remainder.length];if(t)set.set(t.symbol,t);
   }
   return [...set.values()].slice(0,max);
+}
+
+// Readiness is an explanation of how many BUY checks have passed — never a win probability.
+// It is recomputed for each API snapshot so live price deviation and candle expiry count.
+export function assessReadiness(c) {
+  const empty={level:'NONE',met:0,total:13,percent:0,pending:[],checks:[],breakoutGapPct:null};
+  if (!(c && c.entry>0 && c.lastCandle && c.confirmed && !c.stale)) return empty;
+  const okEntry=c.entryZoneValid===true;
+  const checks=[
+    {id:'score',label:'Radar Score ≥80',ok:c.score>=CFG.MIN_BUY_SCORE,
+      detail:`Score ${round(c.score,0)}/100 · perlu ≥${CFG.MIN_BUY_SCORE}`},
+    {id:'trend15',label:'Trend EMA 15m searah',ok:c.trend15===true,detail:'Susunan EMA20 > EMA50 > EMA200 belum lengkap'},
+    {id:'trend1h',label:'Trend 1H disahkan',ok:c.trend1h===true,detail:'Trend EMA20 / EMA50 1H belum sah'},
+    {id:'breakout',label:'Breakout 20 candle',ok:c.breakout===true,detail:'Candle 15m belum tutup di atas paras breakout'},
+    {id:'rvol',label:'RVOL ≥1.50x',ok:c.rvol>=CFG.MIN_BUY_RVOL,
+      detail:`RVOL ${round(c.rvol,2).toFixed(2)}x · perlu ≥${CFG.MIN_BUY_RVOL.toFixed(2)}x`},
+    {id:'adx',label:'ADX ≥22',ok:c.adx>=CFG.MIN_BUY_ADX,
+      detail:`ADX ${round(c.adx,1).toFixed(1)} · perlu ≥${CFG.MIN_BUY_ADX}`},
+    {id:'rsi',label:'RSI 53–70',ok:c.rsi>=53&&c.rsi<=70,
+      detail:`RSI ${round(c.rsi,1)} · perlu 53–70`},
+    {id:'momentum',label:'Momentum 45m positif, ≤5%',ok:c.roc45>0&&c.roc45<=5,
+      detail:`Momentum 45m ${round(c.roc45,2)}% · perlu >0% hingga 5%`},
+    {id:'liquid',label:'Volume ≥$5M & spread ≤0.55%',ok:c.volume24>=CFG.SIGNAL_TURNOVER&&c.spread<=CFG.MAX_SPREAD,
+      detail:`Volume $${round(c.volume24/1e6,2)}M / spread ${round(c.spread,3)}%`},
+    {id:'range',label:'Range 24h ≥5%',ok:c.range24>=CFG.SIGNAL_RANGE,
+      detail:`Range 24h ${round(c.range24,2)}% · perlu ≥${CFG.SIGNAL_RANGE}%`},
+    {id:'chase',label:'Harga tidak terlalu panas',ok:c.stretch<=3.5&&c.change24<=15,
+      detail:`Jarak EMA20 ${round(c.stretch,2)}% / 24h ${round(c.change24,2)}%`},
+    {id:'fresh',label:'Candle tertutup & masih segar',ok:c.confirmed===true&&!c.stale,
+      detail:'Candle lama — tunggu analisis seterusnya'},
+    {id:'entry',label:'Harga live dalam zon anti-chase',ok:okEntry,
+      detail:`Harga live ${round(c.entryDistancePct,2)}% dari rujukan; zon -${CFG.MAX_ENTRY_BELOW_SIGNAL_PCT}% hingga +${CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT}%`},
+  ];
+  const met=checks.filter(x=>x.ok).length, total=checks.length;
+  const pending=checks.filter(x=>!x.ok).map(({id,label,detail})=>({id,label,detail}));
+  const level=c.status==='BUY'?'BUY':met>=10&&c.score>=60?'NEAR BUY':met>=7&&c.score>=40?'EARLY':'MONITOR';
+  const gap=c.breakoutLevel>0&&c.entry>0?round((c.breakoutLevel/c.entry-1)*100,2):null;
+  return {level,met,total,percent:round(met/total*100),pending,
+    checks:checks.map(({id,label,ok})=>({id,label,ok})),breakoutGapPct:gap};
 }

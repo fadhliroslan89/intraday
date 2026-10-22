@@ -1,4 +1,4 @@
-import {CFG, normalizeTicker, parseCandles, analyze, chooseCandidates, round} from './analytics.js';
+import {CFG, normalizeTicker, parseCandles, analyze, chooseCandidates, round, assessReadiness} from './analytics.js';
 const HOST='https://api.kucoin.com';
 const HEADERS={'User-Agent':'KuCoin-Daily-Radar/1.0','Accept':'application/json'};
 const intervalMs={ '15min':900_000, '1hour':3_600_000 };
@@ -112,14 +112,25 @@ export class Market {
       const reasons=[...(a.reasons||[])];
       if(priceDiverged) reasons.push('BUY dibatalkan: harga live di luar zon entry (-'+CFG.MAX_ENTRY_BELOW_SIGNAL_PCT+'% / +'+CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT+'% daripada candle signal)');
       if(suppressed)reasons.push('Signal tamat tempoh: data candle lama, tunggu scan baru');
-      selected.push({...t,...technicals,status,reasons,confirmed:!suppressed&&!!a.confirmed,
+      const item={...t,...technicals,status,reasons,confirmed:!suppressed&&!!a.confirmed,
         stale:!!suppressed,entryDistancePct:distancePct===null?null:round(distancePct,2),
         entryZoneLow:a.entry>0?a.entry*(1-CFG.MAX_ENTRY_BELOW_SIGNAL_PCT/100):0,
         entryZoneHigh:a.entry>0?a.entry*(1+CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT/100):0,
         entryZoneValid:a.entry>0&&!suppressed&&!priceDiverged&&
-          distancePct>=-CFG.MAX_ENTRY_BELOW_SIGNAL_PCT&&distancePct<=CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT});
+          distancePct>=-CFG.MAX_ENTRY_BELOW_SIGNAL_PCT&&distancePct<=CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT};
+      item.readiness=assessReadiness(item);
+      selected.push(item);
     }
     selected.sort((a,b)=>b.score-a.score||b.volume24-a.volume24);
+    // Informational only: readiness does not alter BUY / WATCH / WAIT classification.
+    // Exclude BUY (already displayed in priority) and stale/missing OHLC candidates.
+    const eligibleReadiness=selected.filter(c=>c.readiness.level!=='NONE'&&c.status!=='BUY');
+    const priorityOrder={'NEAR BUY':0,EARLY:1,MONITOR:2};
+    eligibleReadiness.sort((a,b)=>priorityOrder[a.readiness.level]-priorityOrder[b.readiness.level]||
+      b.readiness.met-a.readiness.met||b.score-a.score||b.volume24-a.volume24);
+    const nearBuy=eligibleReadiness.filter(c=>c.readiness.level==='NEAR BUY').slice(0,8);
+    const earlyMomentum=eligibleReadiness.filter(c=>c.readiness.level==='EARLY').slice(0,8);
+    const monitorOnly=eligibleReadiness.filter(c=>c.readiness.level==='MONITOR').slice(0,3);
     const summary={
       totalPairs:tickers.length, analyzed:selected.filter(x=>x.confirmed).length,
       buy:selected.filter(x=>x.status==='BUY').length,watch:selected.filter(x=>x.status==='WATCH').length,
@@ -127,8 +138,11 @@ export class Market {
       updated:this.lastTicker, analyzedAt:this.lastTechnical,
       dataStale:Date.now()-this.lastTicker>90_000,
       candleScanRunning:this.scanRunning,coverage:this.lastRunCandidate,
+      nearCount:eligibleReadiness.filter(c=>c.readiness.level==='NEAR BUY').length,
+      earlyCount:eligibleReadiness.filter(c=>c.readiness.level==='EARLY').length,
     };
     return {ok:this.lastTicker>0&&!summary.dataStale,summary,coins:selected.slice(0,130),
+      nearBuy,earlyMomentum,monitorOnly,
       marketTickers:tickers.map(t=>({symbol:t.symbol,price:t.price,change24:t.change24,volume24:t.volume24})),
       error:this.error,config:CFG};
   }

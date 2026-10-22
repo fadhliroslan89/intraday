@@ -1,4 +1,4 @@
-# KUCOIN DAILY RADAR 5–6% — Website V1.1
+# KUCOIN DAILY RADAR 5–6% — Website V1.2
 
 Website mesra **PC dan telefon** yang mengimbas harga pasangan KuCoin Spot/USDT melalui API awam KuCoin, mengira signal berdasarkan candle 15m yang **sudah tutup**, dan mengadakan Trading Journal manual. **Tidak menghantar order. Tiada API key diperlukan.**
 
@@ -54,7 +54,7 @@ Alternatif: `render.yaml` disertakan untuk Blueprint, tetapi manual setup lebih 
 npm test
 ```
 
-## Kemas kini V1.1
+## Kemas kini V1.2
 
 - Alasan `WATCH` diperjelas dengan bacaan RVOL dan ADX. Skor tinggi sahaja **tidak** menjadikan signal BUY.
 - BUY disekat apabila harga live di luar zon anti-chase / candle lapuk; tidak menjanjikan prestasi.
@@ -62,3 +62,14 @@ npm test
 - Kalkulator TP bersih mengambil kira yuran pada beli dan jual. Stop -2% ialah perubahan harga kasar (kerugian bersih lebih besar kerana yuran). Tidak mengambil kira spread masa keluar dan slippage.
 - Jurnal baharu menyimpan label signal semasa trade dicatat (BUY/WATCH/WAIT). Rekod lama dikekalkan dalam localStorage browser.
 - Ujian lokal boleh lulus tanpa API KuCoin; status live selepas deploy masih perlu disemak secara berasingan.
+
+## Tambahan V1.2 — NEAR BUY / EARLY MOMENTUM
+
+- Panel di antara Priority Watch dan Full Market Screen. Memaparkan shortlist analisis, **bukan** kesemua pasangan yang mempunyai ticker.
+- 13 semakan BUY boleh dilihat di Coin Intelligence (lulus/belum lulus). Pengiraan dibuat semula menggunakan harga live dan kesegaran candle untuk setiap respons API.
+- **NEAR BUY**: memenuhi sekurang-kurangnya 10/13 semakan dan skor ≥60, tetapi **belum** berstatus BUY.
+- **EARLY**: memenuhi sekurang-kurangnya 7/13 semakan dan skor ≥40, tetapi belum NEAR BUY dan belum BUY.
+- Jika tiada NEAR/EARLY, panel memaparkan beberapa calon *MONITOR SAHAJA* yang mempunyai candle sah; ini bukan recommendation.
+- Klik kad untuk analisis penuh, termasuk semua syarat yang belum dipenuhi. Tiada perubahan pada syarat dan kaedah BUY V1.1.
+- Status READYNESS tidak sama dengan probabiliti menang, dan sasaran 5–6% tidak dijamin.
+- Untuk update: upload semua fail dalam folder ini ke **root** GitHub repository asal, commit, semak Render redeploy. Jangan upload ZIP sebagai satu fail.
