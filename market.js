@@ -104,12 +104,20 @@ export class Market {
       const {symbol:_,price:__,change24:___,volume24:____,range24:_____,high24:______,low24:_______,spread:________,...technicals}=a;
       const isOld=a.lastCandle && (Date.now() - a.lastCandle)>60*60_000;
       const freshnessExpired=a.lastCandle && Date.now()-(a.lastCandle+15*60_000)>30*60_000;
-      const priceDiverged=a.status==='BUY'&&a.entry>0&&(t.price<a.entry*.995||t.price>a.entry*1.02);
+      const distancePct=a.entry>0 ? (t.price/a.entry-1)*100 : null;
+      const priceDiverged=a.status==='BUY'&&a.entry>0&&(
+        distancePct < -CFG.MAX_ENTRY_BELOW_SIGNAL_PCT || distancePct > CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT);
       const suppressed=isOld||freshnessExpired;
       const status=suppressed||priceDiverged?'WAIT':a.status;
-      const reasons=priceDiverged?[...(a.reasons||[]),'Harga live sudah lari daripada harga candle signal']:a.reasons;
+      const reasons=[...(a.reasons||[])];
+      if(priceDiverged) reasons.push('BUY dibatalkan: harga live di luar zon entry (-'+CFG.MAX_ENTRY_BELOW_SIGNAL_PCT+'% / +'+CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT+'% daripada candle signal)');
+      if(suppressed)reasons.push('Signal tamat tempoh: data candle lama, tunggu scan baru');
       selected.push({...t,...technicals,status,reasons,confirmed:!suppressed&&!!a.confirmed,
-        stale:!!suppressed});
+        stale:!!suppressed,entryDistancePct:distancePct===null?null:round(distancePct,2),
+        entryZoneLow:a.entry>0?a.entry*(1-CFG.MAX_ENTRY_BELOW_SIGNAL_PCT/100):0,
+        entryZoneHigh:a.entry>0?a.entry*(1+CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT/100):0,
+        entryZoneValid:a.entry>0&&!suppressed&&!priceDiverged&&
+          distancePct>=-CFG.MAX_ENTRY_BELOW_SIGNAL_PCT&&distancePct<=CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT});
     }
     selected.sort((a,b)=>b.score-a.score||b.volume24-a.volume24);
     const summary={

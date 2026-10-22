@@ -1,4 +1,4 @@
-# KUCOIN DAILY RADAR 5–6% — Website V1.0
+# KUCOIN DAILY RADAR 5–6% — Website V1.1
 
 Website mesra **PC dan telefon** yang mengimbas harga pasangan KuCoin Spot/USDT melalui API awam KuCoin, mengira signal berdasarkan candle 15m yang **sudah tutup**, dan mengadakan Trading Journal manual. **Tidak menghantar order. Tiada API key diperlukan.**
 
@@ -7,8 +7,8 @@ Website mesra **PC dan telefon** yang mengimbas harga pasangan KuCoin Spot/USDT 
 - Pantau ticker **semua pasangan USDT** yang aktif, refresh 30s.
 - Analisis OHLCV **15 minit + 1 jam** untuk shortlist dinamik **maksimum 52 pasangan** (volum, movers, range), refresh setiap 120s. Bukan 52 coin tetap.
 - Score 0–100 berdasarkan EMA20/50/200 15m, EMA20/50 1h, RSI, ADX, breakout 20 candle, Relative Volume, liquidity, spread.
-- **BUY** hanya jika syarat ketat lengkap dan candle sah; **WATCH** untuk skor >=60 + liquidity, **WAIT** untuk selainnya.
-- TP1 **+5%**, TP2 **+6%**, SL rujukan **−2%** daripada harga close candle sah terakhir. Harga entry sebenar mungkin berbeza.
+- **BUY** hanya jika syarat ketat lengkap termasuk ADX ≥22, RVOL ≥1.5 dan candle terbaru + live price masih dalam zon -0.5% hingga +1% berbanding rujukan dan candle sah; **WATCH** untuk skor >=60 + liquidity, **WAIT** untuk selainnya.
+- TP1 **+5%**, TP2 **+6%**, SL rujukan **−2%** daripada harga close candle sah terakhir, **kasar** dan sebagai rujukan sahaja. Kalkulator jurnal berasingan menggunakan harga entry manual + fee setiap sisi untuk anggaran TP **bersih** 5%/6% dan SL kasar -2%.
 - Mobile cards + desktop table, carian, filter, ranking, favorite per-browser, top opportunities, carta mini.
 - Paper Trading Journal (manual trade entry / manual closing price, fees dua hala, P/L, win rate). Data localStorage per browser; eksport CSV dan backup/import JSON.
 - Browser notification untuk signal baru semasa laman **dibuka** dan browser memberikan kebenaran. Tiada server push atau notifikasi background bila laman ditutup.
@@ -53,3 +53,12 @@ Alternatif: `render.yaml` disertakan untuk Blueprint, tetapi manual setup lebih 
 ```bash
 npm test
 ```
+
+## Kemas kini V1.1
+
+- Alasan `WATCH` diperjelas dengan bacaan RVOL dan ADX. Skor tinggi sahaja **tidak** menjadikan signal BUY.
+- BUY disekat apabila harga live di luar zon anti-chase / candle lapuk; tidak menjanjikan prestasi.
+- Dalam modal coin, nilai TP1/TP2/SL **rujukan candle (kasar)** dipisahkan daripada kalkulator TP bersih untuk **entry paper trade manual**.
+- Kalkulator TP bersih mengambil kira yuran pada beli dan jual. Stop -2% ialah perubahan harga kasar (kerugian bersih lebih besar kerana yuran). Tidak mengambil kira spread masa keluar dan slippage.
+- Jurnal baharu menyimpan label signal semasa trade dicatat (BUY/WATCH/WAIT). Rekod lama dikekalkan dalam localStorage browser.
+- Ujian lokal boleh lulus tanpa API KuCoin; status live selepas deploy masih perlu disemak secara berasingan.

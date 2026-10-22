@@ -1,3 +1,4 @@
+import {tradePlan} from './trade-math.js';
 const $=id=>document.getElementById(id);
 const q=(s,root=document)=>root.querySelector(s);
 const qa=(s,root=document)=>[...root.querySelectorAll(s)];
@@ -80,30 +81,55 @@ function render(){
   $('journalBadge').textContent=trades.filter(t=>t.status==='OPEN').length;
   if(!q('#view-journal.hidden'))renderJournal();
 }
+function renderTradePreview(){
+  const el=$('paperTradePreview');if(!el)return;
+  const entry=Number($('journalEntry')?.value),fee=Number($('journalFee')?.value);
+  const plan=tradePlan(entry,fee);
+  if(!plan){el.innerHTML='<span class="down">Masukkan entry dan fee yang sah untuk pengiraan TP/SL.</span>';return;}
+  el.innerHTML=`<div class="calculator-head">PARAS BERDASARKAN ENTRY MANUAL · YURAN ${esc(fee.toFixed(2))}% SETIAP SIDE</div>
+  <div class="calculator-grid">
+    <div><small>TP1 +5% BERSIH*</small><b class="up">$${price(plan.tp1Net)}</b></div>
+    <div><small>TP2 +6% BERSIH*</small><b class="up">$${price(plan.tp2Net)}</b></div>
+    <div><small>STOP −2% HARGA</small><b class="down">$${price(plan.slGross)}</b></div>
+    <div><small>NET JIKA STOP*</small><b class="down">${pc(plan.slNetPct,false)}</b></div>
+  </div>
+  <p>* Simulasi selepas fee dua hala, tanpa slippage / perubahan spread. TP net ialah harga yang diperlukan untuk keuntungan bersih sasaran, bukan ramalan atau order automatik.</p>`;
+}
 function openDrawer(sym){
   const c=coin(sym);if(!c)return;
   selectedCoin=sym;
   $('drawerSymbol').textContent=sym;
   const points=c.spark||[];
-  const reasons=(c.reasons||[]).slice(0,7).map(x=>`<p>• ${esc(x)}</p>`).join('')||'<p>Tiada halangan utama direkodkan.</p>';
+  const reasons=(c.reasons||[]).slice(0,9).map(x=>`<p>• ${esc(x)}</p>`).join('')||'<p>Tiada halangan utama direkodkan.</p>';
+  const delta=c.entryDistancePct;
+  const deltaText=Number.isFinite(delta)?pc(delta):'—';
+  const warning=c.status==='BUY'
+    ?'<div class="trade-guidance ready">BUY disahkan pada candle tertutup; semak harga, spread dan order book sebelum sebarang entry.</div>'
+    :`<div class="trade-guidance">${c.status==='WATCH'?'WATCH — setup belum mengesahkan BUY.':'WAIT — tiada setup BUY yang sah.'} Paper trade di bawah ialah rekod latihan manual sahaja.</div>`;
   $('drawerBody').innerHTML=`
     <div class="detail-price">$${price(c.price)}</div><div class="${color(c.change24)}" style="font-weight:850">${pc(c.change24)} · 24H</div>
-    <div class="detail-graph">${graph(points)}</div><div class="mobile-row">${badge(c.status)}<span class="muted">Signal candle: ${c.lastCandle?time(c.lastCandle+900000):'—'}</span></div>
+    <div class="detail-graph">${graph(points)}</div><div class="mobile-row">${badge(c.status)}<span class="muted">Candle tutup: ${c.lastCandle?time(c.lastCandle+900000):'—'}</span></div>
+    ${warning}
     <div class="detail-grid">
       <div class="detail-item"><small>RADAR SCORE</small><strong class="up">${c.score||0}/100</strong></div><div class="detail-item"><small>VOLUME 24H</small><strong>${compact(c.volume24)}</strong></div>
       <div class="detail-item"><small>RELATIVE VOLUME</small><strong>${c.rvol||'—'}x</strong></div><div class="detail-item"><small>RSI / ADX</small><strong>${c.rsi||'—'} / ${c.adx||'—'}</strong></div>
       <div class="detail-item"><small>24H RANGE</small><strong>${pc(c.range24,false)}</strong></div><div class="detail-item"><small>SPREAD</small><strong>${pc(c.spread,false)}</strong></div>
-      <div class="detail-item"><small>TP1 (+5%) *</small><strong class="up">$${c.entry?price(c.tp1):'—'}</strong></div><div class="detail-item"><small>TP2 (+6%) *</small><strong class="up">$${c.entry?price(c.tp2):'—'}</strong></div>
-      <div class="detail-item"><small>ENTRY REFERENCE *</small><strong>${c.entry?'$'+price(c.entry):'—'}</strong></div><div class="detail-item"><small>STOP (−2%) *</small><strong class="down">$${c.entry?price(c.sl):'—'}</strong></div>
-    </div><div class="form-hint">* Paras dihitung daripada harga close candle 15m terakhir, BUKAN harga entry sebenar anda. Sila sesuaikan mengikut fills, fee & spread.</div>
-    <div class="detail-reasons"><h3>${esc(c.setup||'Analisis')}</h3>${reasons}</div>
+      <div class="detail-item"><small>TP1 +5% KASAR †</small><strong class="up">${c.entry?'$'+price(c.tp1):'—'}</strong></div><div class="detail-item"><small>TP2 +6% KASAR †</small><strong class="up">${c.entry?'$'+price(c.tp2):'—'}</strong></div>
+      <div class="detail-item"><small>RUJUKAN CANDLE †</small><strong>${c.entry?'$'+price(c.entry):'—'}</strong></div><div class="detail-item"><small>STOP −2% KASAR †</small><strong class="down">${c.entry?'$'+price(c.sl):'—'}</strong></div>
+      <div class="detail-item"><small>LIVE vs CANDLE</small><strong class="${delta>=0?'up':'down'}">${deltaText}</strong></div><div class="detail-item"><small>ZON HARGA UNTUK SIGNAL BUY</small><strong>${c.entryZoneLow?'$'+price(c.entryZoneLow)+' – $'+price(c.entryZoneHigh):'—'}</strong></div>
+    </div><div class="form-hint">† Paras rujukan daripada close candle 15m terakhir; ini BUKAN harga entry sebenar dan TP di atas belum ditolak fee. Zon entry ialah filter anti-chase, bukan pesanan beli. Harga live: $${price(c.price)}.</div>
+    <div class="detail-reasons"><h3>${esc(c.setup||'Analisis')} · Sebab belum BUY</h3>${reasons}</div>
     <div class="detail-actions"><a href="https://www.kucoin.com/trade/${encodeURIComponent(sym)}" target="_blank" rel="noopener noreferrer">Open KuCoin ↗</a><a href="https://www.tradingview.com/chart/?symbol=KUCOIN%3A${encodeURIComponent(sym.replace('-',''))}" target="_blank" rel="noopener noreferrer">TradingView ↗</a></div>
-    <form id="paperForm" class="form-card"><h3>+ Rekod Paper Trade</h3><p>Entry manual sahaja — tiada order dihantar ke exchange.</p><div class="form-fields"><label>Entry Price (USDT)<input id="journalEntry" type="number" step="any" min="0.000000001" required value="${safeNum(c.price)}"></label><label>Position Size (USDT)<input id="journalSize" type="number" min="1" step="any" required value="100"></label><label>Fee setiap side (%)<input id="journalFee" type="number" min="0" max="5" step="0.01" required value="0.1"></label><label>Note (optional)<input id="journalNote" type="text" maxlength="120" placeholder="Setup / sebab masuk"></label></div><button class="primary-btn" type="submit">+ Tambah ke Journal</button><div class="form-hint">P/L akan dikira dalam USDT berdasarkan size, fee anggaran dan exit manual.</div></form>`;
+    <form id="paperForm" class="form-card"><h3>+ Rekod Paper Trade</h3><p>Entry manual sahaja — tiada order dihantar ke exchange.</p><div class="form-fields"><label>Entry Price (USDT)<input id="journalEntry" type="number" step="any" min="0.000000001" required value="${safeNum(c.price)}"></label><label>Position Size (USDT)<input id="journalSize" type="number" min="1" step="any" required value="100"></label><label>Fee setiap side (%)<input id="journalFee" type="number" min="0" max="5" step="0.01" required value="0.1"></label><label>Note (optional)<input id="journalNote" type="text" maxlength="120" placeholder="Setup / sebab masuk"></label></div>
+      <div id="paperTradePreview" class="paper-trade-preview" aria-live="polite"></div>
+      <button class="primary-btn" type="submit">+ Tambah ke Journal (Manual)</button><div class="form-hint">P/L jurnal menggunakan entry sebenar yang diisi, fee dua hala dan harga exit manual. Tiada sambungan akaun exchange.</div></form>`;
   $('overlay').classList.remove('hidden');$('coinDrawer').classList.remove('hidden');$('coinDrawer').scrollTop=0;document.body.style.overflow='hidden';
+  $('journalEntry').addEventListener('input',renderTradePreview);$('journalFee').addEventListener('input',renderTradePreview);renderTradePreview();
   q('#paperForm').addEventListener('submit',e=>{e.preventDefault();
     const entry=Number($('journalEntry').value),size=Number($('journalSize').value),fee=Number($('journalFee').value),note=$('journalNote').value.trim();
-    if(!entry||entry<=0||size<=0||fee<0||fee>5)return toast('Semak nilai entry, size dan fee.');
-    trades.unshift({id:globalThis.crypto?.randomUUID?.()||String(Date.now()),symbol:sym,status:'OPEN',entry,size,fee,note,opened:stamp(),exit:null,closed:null});
+    if(!Number.isFinite(entry)||entry<=0||!Number.isFinite(size)||size<=0||!tradePlan(entry,fee))return toast('Semak nilai entry, size dan fee.');
+    trades.unshift({id:globalThis.crypto?.randomUUID?.()||String(Date.now()),symbol:sym,status:'OPEN',entry,size,fee,note,opened:stamp(),exit:null,closed:null,
+      signalStatus:c.status,signalScore:c.score,signalCandle:c.lastCandle||null});
     if(persist(JOURNAL,trades)){toast(`Paper trade ${sym} direkodkan.`);closeDrawer();show('journal');}
   });
 }
@@ -147,7 +173,7 @@ function renderJournal(){
   $('journalRows').innerHTML=trades.length?trades.map(t=>{
     const current=t.status==='OPEN'?ticker(t.symbol)?.price:t.exit;
     const profit=tradePnl(t);const roi=profit===null?null:(profit/(t.size*(1+t.fee/100)))*100;
-    return `<div class="journal-row"><div><strong>${esc(t.symbol)}</strong><small>${esc(time(t.opened))} · ${t.status==='OPEN'?badge('WATCH'):'CLOSED'}</small></div><div><strong>Entry $${price(t.entry)}</strong><small>Size ${dollars(t.size)} · Fee ${t.fee}%/side</small></div><div><strong>${t.status==='OPEN'?'Mark':'Exit'} ${current?'$'+price(current):'—'}</strong><small>${esc(t.note||'Tiada note')}</small></div><div><div class="pnl-value ${profit===null?'muted':profit>=0?'up':'down'}">${profit===null?'—':(profit>0?'+':'')+dollars(profit)}</div><small>${roi===null?'Harga tak tersedia':pc(roi)}</small></div><div>${t.status==='OPEN'?`<button class="small-btn" data-trade-close="${esc(t.id)}">Close Trade</button>`:`<button class="danger-btn" data-trade-delete="${esc(t.id)}">Delete</button>`}</div></div>`;
+    return `<div class="journal-row"><div><strong>${esc(t.symbol)}</strong><small>${esc(time(t.opened))} · ${t.status==='OPEN'?'OPEN':'CLOSED'} · signal ${esc(t.signalStatus||'manual')}</small></div><div><strong>Entry $${price(t.entry)}</strong><small>Size ${dollars(t.size)} · Fee ${t.fee}%/side</small></div><div><strong>${t.status==='OPEN'?'Mark':'Exit'} ${current?'$'+price(current):'—'}</strong><small>${esc(t.note||'Tiada note')}</small></div><div><div class="pnl-value ${profit===null?'muted':profit>=0?'up':'down'}">${profit===null?'—':(profit>0?'+':'')+dollars(profit)}</div><small>${roi===null?'Harga tak tersedia':pc(roi)}</small></div><div>${t.status==='OPEN'?`<button class="small-btn" data-trade-close="${esc(t.id)}">Close Trade</button>`:`<button class="danger-btn" data-trade-delete="${esc(t.id)}">Delete</button>`}</div></div>`;
   }).join(''):'<div class="journal-empty"><strong>Belum ada trade direkodkan.</strong>Buka Radar → pilih mana-mana coin → “Tambah ke Journal”.</div>';
 }
 $('journalRows').addEventListener('click',e=>{
@@ -183,7 +209,8 @@ $('importFile').addEventListener('change',async e=>{
         id:String(t.id||'')||globalThis.crypto?.randomUUID?.()||String(Date.now()),symbol:t.symbol,status:t.status,
         entry:Number(t.entry),size:Number(t.size),fee:Number(t.fee),
         opened:String(t.opened||stamp()).slice(0,50),closed:t.closed?String(t.closed).slice(0,50):null,
-        exit:t.status==='CLOSED'?Number(t.exit):null,note:String(t.note||'').slice(0,120)
+        exit:t.status==='CLOSED'?Number(t.exit):null,note:String(t.note||'').slice(0,120),
+        signalStatus:['BUY','WATCH','WAIT'].includes(t.signalStatus)?t.signalStatus:'manual',signalScore:Number(t.signalScore)||0,signalCandle:Number(t.signalCandle)||null
       }));
     if(!incoming.length)throw Error('Tiada trade sah dalam backup');
     if(!window.confirm(`Import ${incoming.length} trade? Trade dengan ID sama akan digantikan; yang lain dikekalkan.`))return;

@@ -33,7 +33,7 @@ const server=http.createServer(async(req,res)=>{
     if(!stat.isFile())throw new Error('Not file');
     const body=await fs.readFile(file);
     res.writeHead(200,{'Content-Type':MIME[path.extname(file)]||'application/octet-stream',...headers,
-      'Cache-Control':pathname==='/'?'no-store':'public, max-age=900'});
+      'Cache-Control':pathname==='/'||/\.(?:js|css|html)$/.test(pathname)?'no-store':'public, max-age=900'});
     res.end(req.method==='HEAD'?undefined:body);
   }catch{res.writeHead(404,headers);res.end('Not found');}
 });

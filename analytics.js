@@ -6,6 +6,10 @@ export const CFG = Object.freeze({
   SIGNAL_RANGE: 5,
   MAX_SPREAD: 0.55,
   MIN_BUY_SCORE: 80,
+  MIN_BUY_ADX: 22,
+  MIN_BUY_RVOL: 1.5,
+  MAX_ENTRY_ABOVE_SIGNAL_PCT: 1.0,
+  MAX_ENTRY_BELOW_SIGNAL_PCT: 0.5,
   TP1: 5,
   TP2: 6,
   SL: 2,
@@ -123,7 +127,9 @@ export function analyze(t, candles15, candles1h, now=Date.now()) {
   if(!trend15)reasons.push('Trend EMA 15m belum sebaris');
   if(!trend1h)reasons.push('Trend 1h belum sah');
   if(!isBreakout)reasons.push('Belum breakout 20 candle');
-  if(RVOL<1.5)reasons.push('Volume breakout lemah');
+  if(RVOL<CFG.MIN_BUY_RVOL)reasons.push('Volume breakout lemah (RVOL '+round(RVOL,2)+'x < '+CFG.MIN_BUY_RVOL+'x)');
+  if(D<CFG.MIN_BUY_ADX)reasons.push('ADX '+round(D,1)+' < '+CFG.MIN_BUY_ADX+' (trend belum cukup kuat)');
+  if(R<53||R>70)reasons.push('RSI di luar zon BUY 53–70');
   if(!liquid)reasons.push('Liquidity / spread tidak sesuai');
   if(stretch>3.5) {score-=12;reasons.push('Harga sudah terlalu jauh dari EMA20');}
   if(t.change24>15){score-=12;reasons.push('Kenaikan 24h terlalu tinggi (chase risk)');}
@@ -131,7 +137,7 @@ export function analyze(t, candles15, candles1h, now=Date.now()) {
   if(t.range24<CFG.SIGNAL_RANGE)reasons.push('Range 24h bawah 5%');
   if(!fresh)reasons.push('Candle terkini sudah lapuk');
   score=Math.max(0,Math.min(100,score));
-  const buy=fresh&&trend15&&trend1h&&isBreakout&&RVOL>=1.5&&R>=53&&R<=70&&D>=18&&
+  const buy=fresh&&trend15&&trend1h&&isBreakout&&RVOL>=CFG.MIN_BUY_RVOL&&R>=53&&R<=70&&D>=CFG.MIN_BUY_ADX&&
     roc45>0&&roc45<=5&&stretch<=3.5&&liquid&&t.range24>=CFG.SIGNAL_RANGE&&t.change24<=15&&score>=CFG.MIN_BUY_SCORE;
   const status=buy?'BUY':(fresh&&score>=60&&liquid?'WATCH':'WAIT');
   const entry=cur.close;
