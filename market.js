@@ -1,4 +1,4 @@
-import {CFG, normalizeTicker, parseCandles, analyze, chooseCandidates, round, assessReadiness} from './analytics.js';
+import {CFG, normalizeTicker, parseCandles, analyze, chooseCandidates, round, assessReadiness, assessBreakout} from './analytics.js';
 const HOST='https://api.kucoin.com';
 const HEADERS={'User-Agent':'KuCoin-Daily-Radar/1.0','Accept':'application/json'};
 const intervalMs={ '15min':900_000, '1hour':3_600_000 };
@@ -119,18 +119,33 @@ export class Market {
         entryZoneValid:a.entry>0&&!suppressed&&!priceDiverged&&
           distancePct>=-CFG.MAX_ENTRY_BELOW_SIGNAL_PCT&&distancePct<=CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT};
       item.readiness=assessReadiness(item);
+      item.breakoutRadar=assessBreakout(item);
+      // Anti-FOMO hard block: even a cached WATCH/BUY does not become a live
+      // recommendation while the live 24h move or closed candles are extreme.
+      if(item.breakoutRadar.risk.blocked && item.breakoutRadar.risk.level==='OVEREXTENDED'){
+        if(item.status!=='WAIT')item.reasons.push('Anti-FOMO: setup dipadam daripada BUY/WATCH kerana harga OVEREXTENDED');
+        item.status='WAIT';
+        item.setup='OVEREXTENDED · elak kejar harga';
+      }
       selected.push(item);
     }
     selected.sort((a,b)=>b.score-a.score||b.volume24-a.volume24);
     // Informational only: readiness does not alter BUY / WATCH / WAIT classification.
     // Exclude BUY (already displayed in priority) and stale/missing OHLC candidates.
-    const eligibleReadiness=selected.filter(c=>c.readiness.level!=='NONE'&&c.status!=='BUY');
+    const eligibleReadiness=selected.filter(c=>c.readiness.level!=='NONE'&&c.status!=='BUY'&&
+      !c.breakoutRadar.risk.blocked);
     const priorityOrder={'NEAR BUY':0,EARLY:1,MONITOR:2};
     eligibleReadiness.sort((a,b)=>priorityOrder[a.readiness.level]-priorityOrder[b.readiness.level]||
       b.readiness.met-a.readiness.met||b.score-a.score||b.volume24-a.volume24);
     const nearBuy=eligibleReadiness.filter(c=>c.readiness.level==='NEAR BUY').slice(0,8);
     const earlyMomentum=eligibleReadiness.filter(c=>c.readiness.level==='EARLY').slice(0,8);
     const monitorOnly=eligibleReadiness.filter(c=>c.readiness.level==='MONITOR').slice(0,3);
+    // Risk alert cards remain visible separately (not as opportunity signals).
+    const safeRadar=selected.filter(c=>!c.breakoutRadar.risk.blocked&&
+      ['EARLY BREAKOUT','BUILDING'].includes(c.breakoutRadar.stage));
+    safeRadar.sort((a,b)=>b.breakoutRadar.quality-a.breakoutRadar.quality||b.volume24-a.volume24);
+    const overextended=selected.filter(c=>c.breakoutRadar.stage==='OVEREXTENDED')
+      .sort((a,b)=>b.change24-a.change24);
     const summary={
       totalPairs:tickers.length, analyzed:selected.filter(x=>x.confirmed).length,
       buy:selected.filter(x=>x.status==='BUY').length,watch:selected.filter(x=>x.status==='WATCH').length,
@@ -140,9 +155,13 @@ export class Market {
       candleScanRunning:this.scanRunning,coverage:this.lastRunCandidate,
       nearCount:eligibleReadiness.filter(c=>c.readiness.level==='NEAR BUY').length,
       earlyCount:eligibleReadiness.filter(c=>c.readiness.level==='EARLY').length,
+      breakoutCount:safeRadar.filter(c=>c.breakoutRadar.stage==='EARLY BREAKOUT').length,
+      buildingCount:safeRadar.filter(c=>c.breakoutRadar.stage==='BUILDING').length,
+      overextendedCount:overextended.length,
     };
     return {ok:this.lastTicker>0&&!summary.dataStale,summary,coins:selected.slice(0,130),
       nearBuy,earlyMomentum,monitorOnly,
+      breakoutCandidates:safeRadar.slice(0,8),overextendedCandidates:overextended.slice(0,8),
       marketTickers:tickers.map(t=>({symbol:t.symbol,price:t.price,change24:t.change24,volume24:t.volume24})),
       error:this.error,config:CFG};
   }

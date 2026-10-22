@@ -20,7 +20,7 @@ let trades=load(JOURNAL,[]);
 if(!Array.isArray(trades))trades=[];
 trades=trades.filter(x=>x&&typeof x.symbol==='string'&&/^[A-Z0-9]+-USDT$/.test(x.symbol));
 let latest=null,lastDataAt=0,busy=false,seenSignals=new Set(),hasBaseline=false,selectedCoin=null,toastTimer=0;
-let nearFilter='ALL';
+let nearFilter='ALL',breakoutFilter='OPPORTUNITY';
 const filters={score:$('filterScore'),volume:$('filterVolume'),range:$('filterRange'),sort:$('sortBy')};
 for(const [k,el] of Object.entries(filters))if([...el.options].some(x=>x.value===String(prefs[k])))el.value=String(prefs[k]);
 const safeSymbol=s=>/^[A-Z0-9]+-USDT$/.test(s||'')?s:'';
@@ -56,7 +56,7 @@ function filterCoins(){
   return result.sort((a,b)=>(safeNum(b[sort])-safeNum(a[sort]))||b.score-a.score);
 }
 function renderCoinRow(c){
-  return `<tr><td><div class="symbol-cell"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}" aria-label="Favorite ${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="coin-name">${esc(c.symbol.split('-')[0])}</div><div class="coin-pair">/ USDT</div></div></div></td><td><strong>$${price(c.price)}</strong></td><td class="${color(c.change24)}">${pc(c.change24)}</td><td>${compact(c.volume24)}</td><td>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</td><td>${c.rsi?safeNum(c.rsi).toFixed(1):'—'}</td><td><div class="score-cell"><b>${c.score||0}</b><span class="score-bar"><i style="width:${c.score||0}%"></i></span></div></td><td>${badge(c.status)}</td><td><button class="row-action" data-open="${esc(c.symbol)}" aria-label="Butiran ${esc(c.symbol)}">↗</button></td></tr>`;
+  return `<tr><td><div class="symbol-cell"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}" aria-label="Favorite ${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="coin-name">${esc(c.symbol.split('-')[0])}</div><div class="coin-pair">/ USDT</div></div></div></td><td><strong>$${price(c.price)}</strong></td><td class="${color(c.change24)}">${pc(c.change24)}</td><td>${compact(c.volume24)}</td><td>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</td><td>${c.rsi?safeNum(c.rsi).toFixed(1):'—'}</td><td><div class="score-cell"><b>${c.score||0}</b><span class="score-bar"><i style="width:${c.score||0}%"></i></span></div></td><td>${badge(c.status)}${c.breakoutRadar?.risk?.level==='OVEREXTENDED'?'<div class="mini-warning">⛔ FOMO</div>':c.breakoutRadar?.risk?.level==='CAUTION'?'<div class="mini-warning">⚠ Caution</div>':''}</td><td><button class="row-action" data-open="${esc(c.symbol)}" aria-label="Butiran ${esc(c.symbol)}">↗</button></td></tr>`;
 }
 function renderMobileRow(c){return `<div class="mobile-coin"><div class="mobile-row mobile-top"><div class="mobile-label"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="mobile-symbol">${esc(c.symbol)}</div><div class="mobile-price">$${price(c.price)}</div></div></div>${badge(c.status)}</div><div class="mobile-info"><div><small>24H MOVE</small><b class="${color(c.change24)}">${pc(c.change24)}</b></div><div><small>VOLUME</small><b>${compact(c.volume24)}</b></div><div><small>RVOL</small><b>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</b></div><div><small>SCORE</small><b class="up">${c.score||0}/100</b></div></div><div class="mobile-row mobile-bottom"><span class="muted">Range ${pc(c.range24,false)} · RSI ${c.rsi||'—'}</span><button class="small-btn" data-open="${esc(c.symbol)}">Lihat Setup →</button></div></div>`;}
 function render(){
@@ -75,6 +75,7 @@ function render(){
   $('topPicks').innerHTML=top.length?top.map((c,i)=>`<button type="button" class="pick-card" data-open="${esc(c.symbol)}"><div class="pick-head"><span class="pick-rank">#0${i+1} · PRIORITY</span>${badge(c.status)}</div><div class="pick-symbol">${esc(c.symbol.split('-')[0])}<span class="muted"> / USDT</span></div><div class="pick-sub">$${price(c.price)}</div><div class="pick-stats"><div><small>24H CHANGE</small><strong class="${color(c.change24)}">${pc(c.change24)}</strong></div><div><small>REL. VOL</small><strong>${c.rvol||0}x</strong></div><div><small>RADAR SCORE</small><strong class="up">${c.score}/100</strong></div></div><div class="pick-footer"><span>${esc(c.setup||'Semak setup')}</span><span class="score-bubble">ANALYZE ↗</span></div></button>`).join(''):
     `<div class="pick-placeholder">${s.candleScanRunning?'Scan candle sedang berjalan...':'Belum ada setup teknikal mencukupi. Semak senarai di bawah.'}</div>`;
   renderNear();
+  renderBreakout();
   const isOnline=latest.ok&&!s.dataStale;
   $('connectionPill').classList.toggle('offline',!isOnline);
   $('connectionLabel').textContent=isOnline?'LIVE DATA':'DATA OFFLINE';
@@ -86,12 +87,14 @@ function render(){
 function renderReadinessCard(c, i){
   const r=c.readiness||{},near=r.level==='NEAR BUY',early=r.level==='EARLY';
   const kind=near?'NEAR BUY':early?'EARLY MOMENTUM':'MONITOR SAHAJA';
+  const risk=c.breakoutRadar?.risk;
+  const riskChip=risk?.level==='CAUTION'?'<span class="risk-chip caution">⚠ HATI-HATI</span>':'';
   const labelColor=near?'near-label-green':early?'near-label-blue':'near-label-grey';
   const blockers=(r.pending||[]).slice(0,3).map(x=>`<li>${esc(x.detail||x.label)}</li>`).join('');
   const more=Math.max(0,(r.pending||[]).length-3);
   const gap=Number.isFinite(r.breakoutGapPct)?(r.breakoutGapPct>0?`Lagi ${pc(r.breakoutGapPct,false)} ke paras breakout`:'Breakout sudah lepasi paras rujukan'):'Jarak breakout tidak tersedia';
   return `<button type="button" class="near-card" data-open="${esc(c.symbol)}" aria-label="Analisis ${esc(c.symbol)}; ${kind}">
-    <div class="near-card-head"><span class="near-kind ${labelColor}">${esc(kind)}</span><span class="near-readiness">${r.met||0}/${r.total||13} semakan</span></div>
+    <div class="near-card-head"><span class="near-kind ${labelColor}">${esc(kind)}</span><span class="near-readiness">${r.met||0}/${r.total||13} semakan ${riskChip}</span></div>
     <div class="near-card-top"><div><h3>${esc(c.symbol.split('-')[0])}<span> / USDT</span></h3><p>$${price(c.price)}</p></div><span class="near-score">${c.score||0}<small>/100</small></span></div>
     <div class="near-progress" role="img" aria-label="${r.met||0} daripada ${r.total||13} kriteria lulus"><span style="width:${Math.max(0,Math.min(100,Number(r.percent)||0))}%"></span></div>
     <div class="near-card-metrics"><div><small>REL. VOL</small><strong>${safeNum(c.rvol).toFixed(2)}x</strong></div><div><small>ADX</small><strong>${safeNum(c.adx).toFixed(1)}</strong></div><div><small>24H</small><strong class="${color(c.change24)}">${pc(c.change24)}</strong></div></div>
@@ -123,6 +126,41 @@ function renderNear(){
     $('nearCards').insertAdjacentHTML('afterbegin','<div class="near-explainer">Belum ada NEAR BUY atau EARLY MOMENTUM. Berikut ialah calon <b>MONITOR SAHAJA</b> yang paling hampir — bukan signal entry.</div>');
   }
 }
+// V1.3 early radar quality ranking. Risk exclusions never become BUY.
+function renderBreakoutCard(c){
+  const b=c.breakoutRadar||{},risk=b.risk||{},isRisk=b.stage==='OVEREXTENDED';
+  const kind=isRisk?'⛔ OVEREXTENDED':b.stage==='EARLY BREAKOUT'?'◈ EARLY BREAKOUT':'◌ BUILDING';
+  const details=(isRisk?(risk.flags||[]):(b.why||[])).slice(0,3).map(s=>`<li>${esc(s)}</li>`).join('');
+  const desc=isRisk?'DISINGKIRKAN DARIPADA CALON ENTRY':'BELUM DISAHKAN BUY · PEMANTAUAN SAHAJA';
+  return `<button type="button" class="breakout-card ${isRisk?'blocked':''}" data-open="${esc(c.symbol)}" aria-label="Butiran ${esc(c.symbol)}; ${esc(kind)}">
+    <div class="breakout-card-top"><span class="breakout-tag ${isRisk?'danger':b.stage==='EARLY BREAKOUT'?'ready':'building'}">${esc(kind)}</span><span class="risk-chip ${risk.level==='CAUTION'?'caution':'neutral'}">${esc(risk.level==='CAUTION'?'⚠ CAUTION':risk.level==='OVEREXTENDED'?'BLOCKED':'CHECKLIST')}</span></div>
+    <div class="breakout-title-row"><div><h3>${esc(c.symbol.split('-')[0])}<span> / USDT</span></h3><small>$${price(c.price)}</small></div><div class="breakout-quality"><strong>${Number(b.quality)||0}<small>/100</small></strong><span>QUALITY RANK</span></div></div>
+    <div class="breakout-metrics"><div><small>24H CHANGE</small><b class="${color(c.change24)}">${pc(c.change24)}</b></div><div><small>RVOL</small><b>${safeNum(c.rvol).toFixed(2)}x</b></div><div><small>VOL ACCEL.</small><b>${Number.isFinite(b.acceleration)?Number(b.acceleration).toFixed(2)+'x':'—'}</b></div><div><small>BREAKOUT GAP</small><b>${Number.isFinite(b.gapPct)?pc(b.gapPct,false):'—'}</b></div></div>
+    <div class="breakout-divider"></div><div class="breakout-description ${isRisk?'red':''}">${esc(desc)}</div>
+    <ul class="breakout-reasons">${details||'<li>Tiada bacaan tambahan.</li>'}</ul>
+    <div class="near-open">${isRisk?'Lihat amaran risiko':'Semak setup & 13 syarat'} <span>↗</span></div>
+  </button>`;
+}
+function renderBreakout(){
+  if(!latest)return;
+  const panel=$('breakoutCards'),count=$('breakoutCounters'),t=$('breakoutTime');
+  if(!latest.ok||latest.summary?.dataStale){
+    count.innerHTML='';panel.innerHTML='<div class="pick-placeholder">Data pasaran offline / lapuk. Calon tidak akan ditunjukkan.</div>';
+    t.textContent='Data tidak segar';return;
+  }
+  const s=latest.summary||{},good=latest.breakoutCandidates||[],bad=latest.overextendedCandidates||[];
+  count.innerHTML=`<span class="breakout-counter">◈ EARLY BREAKOUT <strong>${s.breakoutCount||0}</strong></span><span class="breakout-counter">◌ BUILDING <strong>${s.buildingCount||0}</strong></span><span class="breakout-counter red">⛔ OVEREXTENDED <strong>${s.overextendedCount||0}</strong></span>`;
+  t.textContent=s.analyzedAt?'Candle dianalisis: '+time(s.analyzedAt)+' MYT':'Menunggu scan teknikal';
+  const rows=breakoutFilter==='FOMO'?bad:good;
+  panel.innerHTML=rows.length?rows.slice(0,8).map(renderBreakoutCard).join(''):
+    `<div class="pick-placeholder">${s.candleScanRunning?'Scan candle sedang berjalan...':breakoutFilter==='FOMO'?'Tiada calon OVEREXTENDED dalam shortlist semasa.':'Belum ada calon EARLY BREAKOUT atau BUILDING. Syarat volume dan breakout belum cukup.'}</div>`;
+}
+qa('[data-breakout-filter]').forEach(b=>b.addEventListener('click',()=>{
+  breakoutFilter=b.dataset.breakoutFilter;
+  qa('[data-breakout-filter]').forEach(x=>x.classList.toggle('selected',x.dataset.breakoutFilter===breakoutFilter));
+  renderBreakout();
+}));
+
 qa('[data-near-filter]').forEach(b=>b.addEventListener('click',()=>{
   nearFilter=b.dataset.nearFilter;
   qa('[data-near-filter]').forEach(x=>x.classList.toggle('selected',x.dataset.nearFilter===nearFilter));
@@ -152,13 +190,21 @@ function openDrawer(sym){
   const deltaText=Number.isFinite(delta)?pc(delta):'—';
   const readiness=c.readiness||{checks:[],pending:[],met:0,total:13,level:'NONE'};
   const checksHtml=(readiness.checks||[]).map(k=>`<div class="readiness-check ${k.ok?'passed':'missing'}"><span>${k.ok?'✓':'○'}</span><span>${esc(k.label)}</span></div>`).join('');
-  const warning=c.status==='BUY'
+  const risk=c.breakoutRadar?.risk||{level:'UNKNOWN',flags:[]};
+  const riskBox=risk.level==='OVEREXTENDED'
+    ?`<div class="anti-fomo-notice blocked"><strong>⛔ OVEREXTENDED — Anti-FOMO aktif</strong><p>${esc((risk.flags||[]).join(' • '))}</p><span>Disingkirkan daripada calon BUY/WATCH dan Early Breakout.</span></div>`
+    :risk.level==='CAUTION'
+      ?`<div class="anti-fomo-notice caution"><strong>⚠ CAUTION · Harga mungkin sudah memanjang</strong><p>${esc((risk.flags||[]).join(' • '))}</p></div>`
+      :`<div class="anti-fomo-notice normal"><strong>◈ Anti-FOMO: ${esc(risk.level)}</strong><p>Tiada faktor lanjutan melampau mengikut ambang V1.3; ini bukan signal beli.</p></div>`;
+  const warning=c.status==='BUY' 
     ?'<div class="trade-guidance ready">BUY disahkan pada candle tertutup; semak harga, spread dan order book sebelum sebarang entry.</div>'
     :`<div class="trade-guidance">${c.status==='WATCH'?'WATCH — setup belum mengesahkan BUY.':'WAIT — tiada setup BUY yang sah.'} Paper trade di bawah ialah rekod latihan manual sahaja.</div>`;
   $('drawerBody').innerHTML=`
     <div class="detail-price">$${price(c.price)}</div><div class="${color(c.change24)}" style="font-weight:850">${pc(c.change24)} · 24H</div>
     <div class="detail-graph">${graph(points)}</div><div class="mobile-row">${badge(c.status)}<span class="muted">Candle tutup: ${c.lastCandle?time(c.lastCandle+900000):'—'}</span></div>
     ${warning}
+    ${riskBox}
+    <div class="breakout-drawer-strip"><div><small>QUALITY RANK</small><strong>${c.breakoutRadar?.quality||0}/100</strong></div><div><small>VOL ACCEL 3×15m</small><strong>${Number.isFinite(c.volumeAccel)?c.volumeAccel.toFixed(2)+'x':'—'}</strong></div><div><small>BREAKOUT GAP</small><strong>${Number.isFinite(readiness.breakoutGapPct)?pc(readiness.breakoutGapPct,false):'—'}</strong></div></div>
     <div class="detail-grid">
       <div class="detail-item"><small>RADAR SCORE</small><strong class="up">${c.score||0}/100</strong></div><div class="detail-item"><small>VOLUME 24H</small><strong>${compact(c.volume24)}</strong></div>
       <div class="detail-item"><small>RELATIVE VOLUME</small><strong>${c.rvol||'—'}x</strong></div><div class="detail-item"><small>RSI / ADX</small><strong>${c.rsi||'—'} / ${c.adx||'—'}</strong></div>

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b111d" />
   <meta name="description" content="KuCoin Spot Daily Radar: pantau momentum, breakout, liquidity dan trend 15m/1h untuk mencari peluang 5–6% secara berdisiplin." />
   <title>Daily Radar 5–6% | KuCoin</title>
-  <link rel="stylesheet" href="/styles.css?v=1.2" />
+  <link rel="stylesheet" href="/styles.css?v=1.3" />
 </head>
 <body>
 <div class="app-shell">
@@ -35,7 +35,7 @@
     <section class="view" id="view-radar">
       <div class="hero">
         <div class="hero-copy">
-          <div class="eyebrow"><span class="eyebrow-icon">✦</span> INTRADAY OPPORTUNITY ENGINE <span class="version">V1.2</span></div>
+          <div class="eyebrow"><span class="eyebrow-icon">✦</span> INTRADAY OPPORTUNITY ENGINE <span class="version">V1.3</span></div>
           <h1>Hunt the <em>5–6%</em><br/>daily move.</h1>
           <p>Lebih selektif. Kurang kejar candle. Pantau momentum, volum & breakout pada trend 15m dan 1h — untuk <strong>setup spot long sahaja.</strong></p>
           <div class="hero-subline"><span>◷ Auto refresh 30s</span><span>◇ Candle sah 15m</span><span>↗ Take Profit +5% / +6%</span></div>
@@ -63,7 +63,7 @@
 
       <section class="near-section" id="near-buy" aria-labelledby="nearBuyTitle">
         <div class="section-head">
-          <div><div class="eyebrow eyebrow-small">EARLY MOMENTUM WATCH · V1.2</div><h2 id="nearBuyTitle">Near BUY <span>radar</span></h2></div>
+          <div><div class="eyebrow eyebrow-small">EARLY MOMENTUM WATCH · V1.3</div><h2 id="nearBuyTitle">Near BUY <span>radar</span></h2></div>
           <span class="near-note" id="nearTime">Berdasarkan candle tertutup</span>
         </div>
         <p class="near-intro">Coin paling hampir memenuhi kriteria BUY. <strong>NEAR BUY dan EARLY bukan signal masuk.</strong> Syarat BUY rasmi tidak dilonggarkan.</p>
@@ -77,6 +77,21 @@
           <div class="pick-placeholder">Menunggu analisis candle...</div>
         </div>
         <p class="near-foot">Readiness = bilangan penapis BUY yang lulus daripada 13 syarat, <strong>bukan kebarangkalian untung</strong>. Hanya subset coin dianalisis dengan candle 15m/1h; senarai ini bukan imbasan penuh 813 carta.</p>
+      </section>
+
+      <section class="breakout-section" id="early-breakout" aria-labelledby="breakoutTitle">
+        <div class="section-head breakout-heading">
+          <div><div class="eyebrow eyebrow-small">ANTI-FOMO INTELLIGENCE · V1.3</div><h2 id="breakoutTitle">Early Breakout <span>radar</span></h2></div>
+          <span class="near-note" id="breakoutTime">Menunggu data candle tertutup</span>
+        </div>
+        <p class="near-intro">Cari momentum yang <strong>belum meletup terlalu jauh</strong>. Pecutan volume ialah nisbah 3 candle tertutup terkini berbanding 3 candle sebelumnya. Ini <strong>calon pemantauan, bukan signal BUY</strong>.</p>
+        <div id="breakoutCounters" class="breakout-counters" aria-live="polite"></div>
+        <div class="breakout-controls" role="group" aria-label="Panel breakout dan risiko">
+          <button type="button" data-breakout-filter="OPPORTUNITY" class="near-chip selected">Calon breakout</button>
+          <button type="button" data-breakout-filter="FOMO" class="near-chip">⛔ Overextended</button>
+        </div>
+        <div class="breakout-grid" id="breakoutCards" aria-live="polite"><div class="pick-placeholder">Mengimbas momentum candle...</div></div>
+        <p class="near-foot">Quality Rank dan Readiness ialah skor semakan indikator, <strong>bukan kadar kejayaan atau potensi keuntungan</strong>. OVEREXTENDED tidak muncul sebagai calon entry. Hanya maksimum 52 pasangan disemak setiap pusingan; bukan semua carta KuCoin.</p>
       </section>
 
       <section class="screener-section" id="screener">
@@ -115,9 +130,10 @@
       <div class="page-title"><div class="eyebrow">TRADING FRAMEWORK</div><h1>Guide & <em>strategy</em></h1><p>Bagaimana radar menilai peluang dan cara baca signal dengan lebih selamat.</p></div>
       <div class="guide-grid"><article class="guide-card"><span class="guide-num">01 / TREND</span><h3>Trend 15m + 1h</h3><p>Harga di atas EMA20 &gt; EMA50 &gt; EMA200 pada 15m; pengesahan arah 1h melalui EMA20 &gt; EMA50. Elak melawan trend utama.</p></article><article class="guide-card"><span class="guide-num">02 / MOMENTUM</span><h3>RSI + ADX</h3><p>RSI 53–70, ADX sekurang-kurangnya 22 dan momentum 45 minit positif untuk signal BUY. Terlalu panas? Radar akan kurangkan skor.</p></article><article class="guide-card"><span class="guide-num">03 / VOLUME</span><h3>Relative volume</h3><p>RVOL ≥1.5 berbanding 20 candle sebelumnya. Volum 24h ≥USDT5 juta dan spread ≤0.55% sebagai penapis asas.</p></article><article class="guide-card"><span class="guide-num">04 / BREAKOUT</span><h3>Close di atas high</h3><p>Candle 15 minit terakhir mesti tutup lebih 0.1% di atas high 20 candle sebelumnya. Signal tidak menggunakan candle yang masih berjalan.</p></article><article class="guide-card"><span class="guide-num">05 / RISK</span><h3>TP & SL berasaskan entry</h3><p>TP1 +5%, TP2 +6%, rujukan SL −2% berbanding close candle signal. Kalkulator paper trade menggunakan harga entry yang ditaip serta fee dua hala untuk anggaran TP bersih. Tiada auto-order atau jaminan.</p></article><article class="guide-card"><span class="guide-num">06 / COVERAGE</span><h3>Market vs shortlist</h3><p>Semua ticker Spot/USDT dipantau berkala. Analisis candle 15m/1h dibuat untuk shortlist dinamik sehingga 52 pasangan setiap pusingan supaya panggilan API terkawal.</p></article></div>
       <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">07 / NEAR BUY</span><h3>Near BUY & Early Momentum</h3><p>Panel tambahan menyusun calon berdasarkan 13 pemeriksaan BUY. Near BUY = sekurang-kurangnya 10/13 syarat dan skor ≥60. Early Momentum = sekurang-kurangnya 7/13 dan skor ≥40. Kedua-duanya bukan isyarat BUY. Tiada trade disahkan sehingga semua syarat asal lulus.</p></div>
+      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">08 / ANTI-FOMO V1.3</span><h3>Early Breakout, Volume Acceleration &amp; Overextended</h3><p>Early Breakout memerlukan candle tertutup, harga hampir breakout 20 candle (maks. 2.5%), RVOL ≥1.3x, pecutan volume tiga candle ≥1.10x, trend sekurang-kurangnya satu timeframe dan liquidity memadai. OVEREXTENDED menyekat calon yang telah naik ≥25% dalam 24h, ≥6% di atas EMA20, momentum 45m ≥8% atau RSI ≥76. Had ini ialah heuristik yang boleh menghasilkan false positive / false negative, bukan jaminan pergerakan +5–6%.</p></div>
       <div class="guide-foot"><h3>Definisi label</h3><p><strong class="up">BUY</strong> = semua tapisan ketat dipenuhi pada candle tertutup. <strong class="watch-color">WATCH</strong> = score sekurang-kurangnya 60 dan liquidity memadai, tetapi entry belum sah. <strong>WAIT</strong> = tidak layak atau data candle belum mencukupi. Skor ialah kekuatan kriteria, bukan ramalan pulangan.</p></div>
     </section>
-    <footer class="footer"><div><strong>DAILY<span>RADAR</span></strong> · V1.2</div><span>Data: KuCoin Public API · Bukan nasihat pelaburan · No auto trading</span></footer>
+    <footer class="footer"><div><strong>DAILY<span>RADAR</span></strong> · V1.3</div><span>Data: KuCoin Public API · Bukan nasihat pelaburan · No auto trading</span></footer>
   </main>
 </div>
 
@@ -131,6 +147,6 @@
   <div class="drawer-body"><p class="settings-intro">Ini mengubah tapisan yang anda nampak, bukan syarat signal BUY pada server.</p><label class="settings-field">Skor minimum<input type="range" id="settingsScore" min="0" max="90" step="10" value="60"/><span id="settingsScoreValue">60+</span></label><label class="settings-field">Minimum volum 24h (USDT)<select id="settingsVolume"><option value="0">Semua</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option></select></label><div class="settings-note">Candle hanya dikira untuk subset coin paling aktif; tiada data palsu atau signal BUY bila API tidak tersedia.</div><button class="primary-btn" id="saveSettings">Simpan & tutup</button></div>
 </aside>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-<script type="module" src="/app.js?v=1.2"></script>
+<script type="module" src="/app.js?v=1.3"></script>
 </body>
 </html>

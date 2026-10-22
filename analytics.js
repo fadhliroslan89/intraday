@@ -13,6 +13,15 @@ export const CFG = Object.freeze({
   TP1: 5,
   TP2: 6,
   SL: 2,
+  // Anti-FOMO thresholds are transparent heuristics, not an outcome prediction.
+  FOMO_24H_CAUTION: 12,
+  FOMO_24H_BLOCK: 25,
+  FOMO_EMA_CAUTION: 3.5,
+  FOMO_EMA_BLOCK: 6,
+  FOMO_45M_BLOCK: 8,
+  BREAKOUT_RADAR_GAP: 2.5,
+  BREAKOUT_RADAR_RVOL: 1.3,
+  BREAKOUT_RADAR_ACCEL: 1.1,
 });
 
 export const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -87,7 +96,7 @@ const pct = (a,b) => b>0?(a/b-1)*100:0;
 export function analyze(t, candles15, candles1h, now=Date.now()) {
   const base={...t,score:0,status:'WAIT',reasons:[],confirmed:false,lastCandle:null,
     entry:0,tp1:0,tp2:0,sl:0,rvol:0,rsi:0,adx:0,roc45:0,ema20:0,ema50:0,
-    trend15:false,trend1h:false,breakout:false,breakoutLevel:0,spark:[],setup:'Belum cukup data candle'};
+    trend15:false,trend1h:false,breakout:false,breakoutLevel:0,volumeAccel:null,spark:[],setup:'Belum cukup data candle'};
   if(candles15.length<205||candles1h.length<56)return base;
   const c=candles15, h=candles1h, closes=c.map(x=>x.close), hc=h.map(x=>x.close);
   const cur=c.at(-1), prev=c.at(-2);
@@ -96,6 +105,11 @@ export function analyze(t, candles15, candles1h, now=Date.now()) {
   const R=rsi(closes), D=adx(c);
   const rv=mean(c.slice(-21,-1).map(x=>x.turnover));
   const RVOL=rv>0?cur.turnover/rv:0;
+  // Confirmed 15m candles only, compare last 3 with the preceding 3. A ratio
+  // alone does not prove an actual breakout or predict future price moves.
+  const prior3=mean(c.slice(-6,-3).map(x=>x.turnover));
+  const recent3=mean(c.slice(-3).map(x=>x.turnover));
+  const volumeAccel=prior3>0 ? round(recent3/prior3,2) : null;
   const roc45=pct(cur.close,c.at(-4).close);
   const prevHigh=Math.max(...c.slice(-21,-1).map(x=>x.high));
   const isBreakout=cur.close>prevHigh*1.001;
@@ -143,7 +157,7 @@ export function analyze(t, candles15, candles1h, now=Date.now()) {
   const entry=cur.close;
   return {...base,score,status,reasons,confirmed:fresh,lastCandle:cur.time,
     entry,tp1:entry*(1+CFG.TP1/100),tp2:entry*(1+CFG.TP2/100),sl:entry*(1-CFG.SL/100),
-    rvol:round(RVOL),rsi:round(R,1),adx:round(D,1),roc45:round(roc45),ema20:E20,ema50:E50,
+    volumeAccel,rvol:round(RVOL),rsi:round(R,1),adx:round(D,1),roc45:round(roc45),ema20:E20,ema50:E50,
     trend15,trend1h,breakout:isBreakout,breakoutLevel:prevHigh*1.001,spark:c.slice(-35).map(x=>round(x.close,8)),
     setup:buy?'Breakout disahkan + trend 15m/1h':status==='WATCH'?'Momentum dipantau':'Belum penuhi syarat BUY',
     stretch:round(stretch),time:now};
@@ -204,4 +218,72 @@ export function assessReadiness(c) {
   const gap=c.breakoutLevel>0&&c.entry>0?round((c.breakoutLevel/c.entry-1)*100,2):null;
   return {level,met,total,percent:round(met/total*100),pending,
     checks:checks.map(({id,label,ok})=>({id,label,ok})),breakoutGapPct:gap};
+}
+
+
+// V1.3 anti-FOMO: severe extensions are a hard block for the early radar.
+// CAUTION is informational; nothing here is a forecast or win probability.
+export function classifyFomo(c) {
+  if (!c || !(c.entry>0) || c.stale || !c.confirmed) {
+    return {level:'UNKNOWN',blocked:true,flags:['Data candle belum disahkan atau lapuk']};
+  }
+  const flags=[];
+  const ch=num(c.change24),stretch=num(c.stretch),roc=num(c.roc45),R=num(c.rsi);
+  const distance=Number.isFinite(c.entryDistancePct)?c.entryDistancePct:null;
+  let severe=false;
+  if(ch>=CFG.FOMO_24H_BLOCK){flags.push(`24h sudah naik ${round(ch,2)}% (had ${CFG.FOMO_24H_BLOCK}%)`);severe=true;}
+  else if(ch>=CFG.FOMO_24H_CAUTION)flags.push(`24h naik ${round(ch,2)}%: pantau risiko mengejar harga`);
+  if(stretch>=CFG.FOMO_EMA_BLOCK){flags.push(`Harga ${round(stretch,2)}% di atas EMA20 (terlalu jauh)`);severe=true;}
+  else if(stretch>=CFG.FOMO_EMA_CAUTION)flags.push(`Jarak dari EMA20 ${round(stretch,2)}%`);
+  if(roc>=CFG.FOMO_45M_BLOCK){flags.push(`Momentum 45m +${round(roc,2)}% (lonjakan pantas)`);severe=true;}
+  else if(roc>5)flags.push(`Momentum 45m +${round(roc,2)}% (tinggi)`);
+  if(R>=76){flags.push(`RSI ${round(R,1)} terlalu panas`);severe=true;}
+  else if(R>71)flags.push(`RSI ${round(R,1)} menghampiri zon panas`);
+  if(distance!==null&&distance>CFG.MAX_ENTRY_ABOVE_SIGNAL_PCT){
+    flags.push(`Harga live +${round(distance,2)}% dari rujukan candle: di luar zon entry`);
+  }
+  return {level:severe?'OVEREXTENDED':flags.length?'CAUTION':'NORMAL',blocked:severe,flags};
+}
+
+// Separate explanatory shortlist ranking, NOT the official BUY score.
+// Computed only from fresh closed candles with live ticker constraints.
+export function assessBreakout(c) {
+  const risk=classifyFomo(c);
+  const r=c?.readiness||{};
+  const gap=Number.isFinite(r.breakoutGapPct)?r.breakoutGapPct:null;
+  if (!c?.entry || !c?.confirmed || c?.stale || risk.level==='UNKNOWN') {
+    return {stage:'NO_DATA',quality:0,acceleration:null,gapPct:null,risk,
+      why:['Data candle tidak lengkap atau tidak segar']};
+  }
+  const accel=Number.isFinite(c.volumeAccel)?c.volumeAccel:null;
+  const liquid=c.volume24>=CFG.SIGNAL_TURNOVER&&c.spread<=CFG.MAX_SPREAD;
+  const pendingBreakout=!c.breakout;
+  const closeToBreakout=Number.isFinite(gap)&&gap>=0&&gap<=CFG.BREAKOUT_RADAR_GAP;
+  const volumeStrong=c.rvol>=CFG.BREAKOUT_RADAR_RVOL;
+  const volumeRising=accel!==null&&accel>=CFG.BREAKOUT_RADAR_ACCEL;
+  const adxStrong=c.adx>=CFG.MIN_BUY_ADX;
+  const trendSupported=c.trend15||c.trend1h;
+  const why=[];
+  if(closeToBreakout)why.push(`Lagi ${round(gap,2)}% ke breakout 20 candle`);
+  else if(Number.isFinite(gap))why.push(gap<0?'Harga telah lepasi paras breakout':'Jarak breakout masih '+round(gap,2)+'%');
+  if(volumeStrong)why.push(`RVOL ${round(c.rvol,2)}x`);
+  else why.push(`RVOL ${round(c.rvol,2)}x di bawah ${CFG.BREAKOUT_RADAR_RVOL}x`);
+  if(accel!==null)why.push(`Pecutan volume 3 candle ${round(accel,2)}x${volumeRising?' (menaik)':accel<.85?' (menurun)':''}`);
+  else why.push('Pecutan volume tidak tersedia');
+  if(!liquid)why.push('Liquidity / spread tidak cukup');
+  const quality=Math.max(0,Math.min(100,Math.round(
+    Math.min(35,num(c.score)*.35)+
+    (closeToBreakout?18:Number.isFinite(gap)&&gap>=0&&gap<=4?8:0)+
+    (volumeStrong?12:0)+(volumeRising?12:0)+
+    (adxStrong?7:0)+(trendSupported?10:0)+(liquid?6:0)
+    -(risk.level==='CAUTION'?15:0)-(risk.blocked?45:0)
+  )));
+  let stage='MONITOR';
+  if(risk.blocked)stage='OVEREXTENDED';
+  else if(!liquid)stage='MONITOR';
+  else if(pendingBreakout&&closeToBreakout&&volumeStrong&&volumeRising&&num(c.score)>=40&&trendSupported)stage='EARLY BREAKOUT';
+  else if(pendingBreakout&&num(c.score)>=40&&
+    ((volumeStrong&&volumeRising)||(closeToBreakout&&adxStrong&&trendSupported)))stage='BUILDING';
+  else if((accel!==null&&accel<.85)||num(c.rvol)<.9)stage='COOLING';
+  return {stage,quality,acceleration:accel,gapPct:Number.isFinite(gap)?round(gap,2):null,risk,why};
 }
