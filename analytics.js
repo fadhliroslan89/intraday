@@ -1,3 +1,4 @@
+import {detectTimingPattern} from './timing.js';
 // Pure, testable analysis. A score is an indicator checklist, NOT a probability of profit.
 export const CFG = Object.freeze({
   MAX_CANDIDATES: 52,
@@ -95,7 +96,7 @@ export function parseCandles(rows, intervalMin, now=Date.now()) {
 const pct = (a,b) => b>0?(a/b-1)*100:0;
 export function analyze(t, candles15, candles1h, now=Date.now()) {
   const base={...t,score:0,status:'WAIT',reasons:[],confirmed:false,lastCandle:null,
-    entry:0,tp1:0,tp2:0,sl:0,rvol:0,rsi:0,adx:0,roc45:0,ema20:0,ema50:0,
+    entry:0,tp1:0,tp2:0,sl:0,timingPattern:null,rvol:0,rsi:0,adx:0,roc45:0,ema20:0,ema50:0,
     trend15:false,trend1h:false,breakout:false,breakoutLevel:0,volumeAccel:null,spark:[],setup:'Belum cukup data candle'};
   if(candles15.length<205||candles1h.length<56)return base;
   const c=candles15, h=candles1h, closes=c.map(x=>x.close), hc=h.map(x=>x.close);
@@ -157,7 +158,7 @@ export function analyze(t, candles15, candles1h, now=Date.now()) {
   const entry=cur.close;
   return {...base,score,status,reasons,confirmed:fresh,lastCandle:cur.time,
     entry,tp1:entry*(1+CFG.TP1/100),tp2:entry*(1+CFG.TP2/100),sl:entry*(1-CFG.SL/100),
-    volumeAccel,rvol:round(RVOL),rsi:round(R,1),adx:round(D,1),roc45:round(roc45),ema20:E20,ema50:E50,
+    volumeAccel,timingPattern:detectTimingPattern(c),rvol:round(RVOL),rsi:round(R,1),adx:round(D,1),roc45:round(roc45),ema20:E20,ema50:E50,
     trend15,trend1h,breakout:isBreakout,breakoutLevel:prevHigh*1.001,spark:c.slice(-35).map(x=>round(x.close,8)),
     setup:buy?'Breakout disahkan + trend 15m/1h':status==='WATCH'?'Momentum dipantau':'Belum penuhi syarat BUY',
     stretch:round(stretch),time:now};

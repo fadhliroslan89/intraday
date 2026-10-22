@@ -20,7 +20,7 @@ let trades=load(JOURNAL,[]);
 if(!Array.isArray(trades))trades=[];
 trades=trades.filter(x=>x&&typeof x.symbol==='string'&&/^[A-Z0-9]+-USDT$/.test(x.symbol));
 let latest=null,lastDataAt=0,busy=false,seenSignals=new Set(),hasBaseline=false,selectedCoin=null,toastTimer=0;
-let nearFilter='ALL',breakoutFilter='OPPORTUNITY';
+let nearFilter='ALL',breakoutFilter='OPPORTUNITY',timingFilter='WATCH';
 const filters={score:$('filterScore'),volume:$('filterVolume'),range:$('filterRange'),sort:$('sortBy')};
 for(const [k,el] of Object.entries(filters))if([...el.options].some(x=>x.value===String(prefs[k])))el.value=String(prefs[k]);
 const safeSymbol=s=>/^[A-Z0-9]+-USDT$/.test(s||'')?s:'';
@@ -56,7 +56,7 @@ function filterCoins(){
   return result.sort((a,b)=>(safeNum(b[sort])-safeNum(a[sort]))||b.score-a.score);
 }
 function renderCoinRow(c){
-  return `<tr><td><div class="symbol-cell"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}" aria-label="Favorite ${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="coin-name">${esc(c.symbol.split('-')[0])}</div><div class="coin-pair">/ USDT</div></div></div></td><td><strong>$${price(c.price)}</strong></td><td class="${color(c.change24)}">${pc(c.change24)}</td><td>${compact(c.volume24)}</td><td>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</td><td>${c.rsi?safeNum(c.rsi).toFixed(1):'—'}</td><td><div class="score-cell"><b>${c.score||0}</b><span class="score-bar"><i style="width:${c.score||0}%"></i></span></div></td><td>${badge(c.status)}${c.breakoutRadar?.risk?.level==='OVEREXTENDED'?'<div class="mini-warning">⛔ FOMO</div>':c.breakoutRadar?.risk?.level==='CAUTION'?'<div class="mini-warning">⚠ Caution</div>':''}</td><td><button class="row-action" data-open="${esc(c.symbol)}" aria-label="Butiran ${esc(c.symbol)}">↗</button></td></tr>`;
+  return `<tr><td><div class="symbol-cell"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}" aria-label="Favorite ${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="coin-name">${esc(c.symbol.split('-')[0])}</div><div class="coin-pair">/ USDT</div></div></div></td><td><strong>$${price(c.price)}</strong></td><td class="${color(c.change24)}">${pc(c.change24)}</td><td>${compact(c.volume24)}</td><td>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</td><td>${c.rsi?safeNum(c.rsi).toFixed(1):'—'}</td><td><div class="score-cell"><b>${c.score||0}</b><span class="score-bar"><i style="width:${c.score||0}%"></i></span></div></td><td>${badge(c.status)}${c.smartTiming?.stage==='FALSE BREAKOUT'?'<div class="mini-warning">⛔ FALSE BREAKOUT</div>':c.breakoutRadar?.risk?.level==='OVEREXTENDED'?'<div class="mini-warning">⛔ FOMO</div>':c.breakoutRadar?.risk?.level==='CAUTION'?'<div class="mini-warning">⚠ Caution</div>':''}</td><td><button class="row-action" data-open="${esc(c.symbol)}" aria-label="Butiran ${esc(c.symbol)}">↗</button></td></tr>`;
 }
 function renderMobileRow(c){return `<div class="mobile-coin"><div class="mobile-row mobile-top"><div class="mobile-label"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="mobile-symbol">${esc(c.symbol)}</div><div class="mobile-price">$${price(c.price)}</div></div></div>${badge(c.status)}</div><div class="mobile-info"><div><small>24H MOVE</small><b class="${color(c.change24)}">${pc(c.change24)}</b></div><div><small>VOLUME</small><b>${compact(c.volume24)}</b></div><div><small>RVOL</small><b>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</b></div><div><small>SCORE</small><b class="up">${c.score||0}/100</b></div></div><div class="mobile-row mobile-bottom"><span class="muted">Range ${pc(c.range24,false)} · RSI ${c.rsi||'—'}</span><button class="small-btn" data-open="${esc(c.symbol)}">Lihat Setup →</button></div></div>`;}
 function render(){
@@ -76,6 +76,8 @@ function render(){
     `<div class="pick-placeholder">${s.candleScanRunning?'Scan candle sedang berjalan...':'Belum ada setup teknikal mencukupi. Semak senarai di bawah.'}</div>`;
   renderNear();
   renderBreakout();
+  renderTiming();
+  renderPerformance();
   const isOnline=latest.ok&&!s.dataStale;
   $('connectionPill').classList.toggle('offline',!isOnline);
   $('connectionLabel').textContent=isOnline?'LIVE DATA':'DATA OFFLINE';
@@ -166,6 +168,52 @@ qa('[data-near-filter]').forEach(b=>b.addEventListener('click',()=>{
   qa('[data-near-filter]').forEach(x=>x.classList.toggle('selected',x.dataset.nearFilter===nearFilter));
   renderNear();
 }));
+
+// V1.4: Distinct from BUY. Only fresh, confirmed closed-candle interpretations.
+function renderTimingCard(c){
+  const t=c.smartTiming||{},trap=t.stage==='FALSE BREAKOUT';
+  const stage=t.stage||'WAIT',risk=t.risk||'HIGH';
+  const level=Number.isFinite(t.level)?'$'+price(t.level):'—';
+  const zone=Number.isFinite(t.entryZoneLow)&&Number.isFinite(t.entryZoneHigh)
+    ?`$${price(t.entryZoneLow)} – $${price(t.entryZoneHigh)}`:'Tiada (tunggu struktur baharu)';
+  const notes=(t.notes||[]).concat((t.riskReasons||[]).slice(0,2)).slice(0,4).map(x=>`<li>${esc(x)}</li>`).join('');
+  return `<button class="timing-card ${trap?'timing-trap':''}" type="button" data-open="${esc(c.symbol)}" aria-label="Smart timing ${esc(c.symbol)}">
+    <div class="timing-card-top"><span class="timing-stage ${trap?'trap':''}">${esc(stage)}</span><span class="timing-risk ${risk==='HIGH'?'high':risk==='MEDIUM'?'medium':'low'}">RISIKO ${esc(risk)}</span></div>
+    <div class="timing-symbol"><strong>${esc(c.symbol.split('-')[0])}<small>/USDT</small></strong><span>$${price(c.price)}</span></div>
+    <div class="timing-metrics"><div><small>SCORE ASAL</small><b>${c.score||0}/100</b></div><div><small>RVOL</small><b>${safeNum(c.rvol).toFixed(2)}x</b></div><div><small>ATR14</small><b>${Number.isFinite(t.atrPct)?pc(t.atrPct,false):'—'}</b></div><div><small>LIVE DALAM ZON</small><b>${t.withinZone?'YA':'TIDAK'}</b></div></div>
+    <div class="timing-zone"><small>RESISTANCE RUJUKAN</small><b>${level}</b><small>ZON ATR (BUKAN ENTRY AUTOMATIK)</small><b>${zone}</b></div>
+    <ul class="timing-reasons">${notes}</ul><div class="near-open">Lihat penjelasan penuh <span>↗</span></div>
+  </button>`;
+}
+function renderTiming(){
+  const cards=$('timingCards'),ct=$('timingCounters'),clock=$('timingTime');
+  if(!latest?.ok||latest?.summary?.dataStale){cards.innerHTML='<div class="pick-placeholder">Data live lapuk / offline; signal timing disembunyikan.</div>';ct.textContent='';return;}
+  const s=latest.summary||{},good=latest.timingCandidates||[],bad=latest.timingWarnings||[];
+  ct.innerHTML=`<span class="breakout-counter">◈ WATCH TIMING <strong>${s.timingCount||0}</strong></span><span class="breakout-counter red">⛔ FALSE BREAKOUT <strong>${s.falseBreakoutCount||0}</strong></span>`;
+  clock.textContent=s.analyzedAt?'Scan: '+time(s.analyzedAt)+' MYT':'Menunggu analisis';
+  const selected=timingFilter==='TRAP'?bad:good;
+  cards.innerHTML=selected.length?selected.map(renderTimingCard).join(''):`<div class="pick-placeholder">${s.candleScanRunning?'Sedang mengimbas candle...':timingFilter==='TRAP'?'Tiada breakout palsu dikesan dalam shortlist semasa.':'Belum ada calon timing yang layak dipantau sekarang.'}</div>`;
+}
+qa('[data-timing-filter]').forEach(b=>b.addEventListener('click',()=>{
+  timingFilter=b.dataset.timingFilter;
+  qa('[data-timing-filter]').forEach(x=>x.classList.toggle('selected',x.dataset.timingFilter===timingFilter));
+  renderTiming();
+}));
+const outcomeLabel={PENDING:'BELUM CUKUP DATA',WIN:'TP TERSENTUH',LOSS:'SL TERSENTUH',AMBIGUOUS:'TIDAK PASTI',EXPIRED:'TIADA TP / SL 24H',INCOMPLETE:'DATA TERPUTUS'};
+function renderPerformance(){
+  const perf=latest?.signalPerformance||{},stats=$('performanceStats'),list=$('performanceList');
+  if(!latest?.ok||latest?.summary?.dataStale){stats.innerHTML='<div class="pick-placeholder">Data offline / lapuk. Tracker tidak boleh dikemas kini.</div>';list.innerHTML='';return;}
+  const a=perf.tp5||{},b=perf.tp6||{};
+  stats.innerHTML=`<div class="perf-stat"><small>BUY DICATAT (SEJAK RESTART)</small><strong>${perf.total||0}</strong></div>
+    <div class="perf-stat"><small>TP +5% · DARIPADA MENANG/KALAH</small><strong>${a.rate===null||a.rate===undefined?'—':a.rate.toFixed(1)+'%'}</strong><span>${a.win||0} hit / ${a.loss||0} stop</span></div>
+    <div class="perf-stat"><small>TP +6% · DARIPADA MENANG/KALAH</small><strong>${b.rate===null||b.rate===undefined?'—':b.rate.toFixed(1)+'%'}</strong><span>${b.win||0} hit / ${b.loss||0} stop</span></div>
+    <div class="perf-stat"><small>AMBIGUOUS / PENDING (TP5)</small><strong>${(a.ambiguous||0)} / ${(a.pending||0)}</strong></div>`;
+  const rows=perf.records||[];
+  list.innerHTML=rows.length?`<div class="perf-list-head"><span>SEJARAH SIGNAL · SERVER MEMORY</span><span>TP+5% / TP+6%</span></div>`+
+    rows.slice(0,10).map(r=>`<div class="perf-row"><div><b>${esc(r.symbol)}</b><small>${time(r.closedAt)} · rujukan $${price(r.entry)} · skor ${r.score||0}</small></div><div><span class="outcome ${r.outcome5==='WIN'?'win':r.outcome5==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome5]||r.outcome5)}</span><span class="outcome ${r.outcome6==='WIN'?'win':r.outcome6==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome6]||r.outcome6)}</span></div></div>`).join(''):
+    '<div class="pick-placeholder">Belum ada signal BUY baharu yang dapat direkodkan sejak server ini bermula. Ini normal dengan syarat BUY yang ketat.</div>';
+}
+
 function renderTradePreview(){
   const el=$('paperTradePreview');if(!el)return;
   const entry=Number($('journalEntry')?.value),fee=Number($('journalFee')?.value);
@@ -204,6 +252,13 @@ function openDrawer(sym){
     <div class="detail-graph">${graph(points)}</div><div class="mobile-row">${badge(c.status)}<span class="muted">Candle tutup: ${c.lastCandle?time(c.lastCandle+900000):'—'}</span></div>
     ${warning}
     ${riskBox}
+    <div class="timing-drawer"><h3>SMART ENTRY TIMING · V1.4</h3>
+      <div class="timing-drawer-kpis"><span>Status: <strong>${esc(c.smartTiming?.stage||'NO DATA')}</strong></span><span>Risk: <strong>${esc(c.smartTiming?.risk||'HIGH')}</strong></span></div>
+      <p>${esc((c.smartTiming?.notes||['Data candle tidak cukup']).join(' • '))}</p>
+      <div class="form-hint">Resistance: ${Number.isFinite(c.smartTiming?.level)?'$'+price(c.smartTiming.level):'—'} · Zon ATR: ${Number.isFinite(c.smartTiming?.entryZoneLow)?'$'+price(c.smartTiming.entryZoneLow)+' – $'+price(c.smartTiming.entryZoneHigh):'Tiada'} · ${c.smartTiming?.withinZone?'Harga live dalam zon':'Harga live di luar zon / zon tidak tersedia'}</div>
+      <p class="timing-drawer-warnings">${esc((c.smartTiming?.riskReasons||[]).join(' • ')||'Tiada amaran tambahan menurut ambang heuristik')}</p>
+      <div class="form-hint">Skor teknikal: ${c.score||0}/100 · Risiko diasingkan. Semua paras hanya untuk pemerhatian, bukan harga order atau jaminan.</div>
+    </div>
     <div class="breakout-drawer-strip"><div><small>QUALITY RANK</small><strong>${c.breakoutRadar?.quality||0}/100</strong></div><div><small>VOL ACCEL 3×15m</small><strong>${Number.isFinite(c.volumeAccel)?c.volumeAccel.toFixed(2)+'x':'—'}</strong></div><div><small>BREAKOUT GAP</small><strong>${Number.isFinite(readiness.breakoutGapPct)?pc(readiness.breakoutGapPct,false):'—'}</strong></div></div>
     <div class="detail-grid">
       <div class="detail-item"><small>RADAR SCORE</small><strong class="up">${c.score||0}/100</strong></div><div class="detail-item"><small>VOLUME 24H</small><strong>${compact(c.volume24)}</strong></div>
