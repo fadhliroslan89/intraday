@@ -20,7 +20,7 @@ export function equalSecret(a,b){
 }
 export function alertKey(coin){return `${coin.symbol}|${coin.lastCandle}`;}
 export function buildReadyAlert(entry,now=Date.now(),url='https://intraday-t1ln.onrender.com'){
-  const c=entry.coin, fee5=netTargetGrossPct(5),fee6=netTargetGrossPct(6);
+  const c=entry.coin, fee4=netTargetGrossPct(4),fee6=netTargetGrossPct(6);
   const live=c.price, when=new Intl.DateTimeFormat('en-MY',{timeZone:'Asia/Kuala_Lumpur',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(c.lastCandle+FIFTEEN);
   const q=s=>escapeHtml(s);
   return [`🟢 <b>FINAL READY · BUY SIGNAL CONFIRMED</b>`,
@@ -28,7 +28,7 @@ export function buildReadyAlert(entry,now=Date.now(),url='https://intraday-t1ln.
     `🕒 Candle 15m tutup: <b>${q(when)} MYT</b>`,
     `💵 Harga live semasa scan: <b>$${formatPrice(live)}</b>`,
     `📍 Zon anti-chase: <b>$${formatPrice(c.entryZoneLow)} – $${formatPrice(c.entryZoneHigh)}</b>`,
-    `🎯 TP1 (+5% net anggaran): <b>$${formatPrice(live*(1+fee5/100))}</b>`,
+    `🎯 TP1 (+4% net anggaran): <b>$${formatPrice(live*(1+fee4/100))}</b>`,
     `🎯 TP2 (+6% net anggaran): <b>$${formatPrice(live*(1+fee6/100))}</b>`,
     `🛑 SL (−2% kasar): <b>$${formatPrice(live*.98)}</b>`,
     `📊 Score ${q(c.score)}/100 | RVOL ${q(Number(c.rvol).toFixed(2))}x | ADX ${q(Number(c.adx).toFixed(1))}`,

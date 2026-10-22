@@ -1,9 +1,15 @@
-# KuCoin Daily Radar 5–6% — Website V1.7.1
+# KuCoin Daily Radar 4–6% — Website V1.7.2
 
-Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot order atau jaminan keuntungan 5–6% sehari. Kekalkan URL Render dan repo GitHub `intraday` sedia ada.
+Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot order atau jaminan keuntungan 4–6% sehari. Kekalkan URL Render dan repo GitHub `intraday` sedia ada.
 
 
-## V1.7.1 — Telegram FINAL READY alert (berasingan daripada notifikasi browser)
+## Perubahan utama V1.7.2 — Target 4–6%
+
+TP1: **+4% bersih anggaran**; TP2: **+6% bersih anggaran**. Syarat kelayakan BUY tidak diubah (termasuk 24h range ≥5% untuk signal rasmi). Semua harga TP1 diperbaharui dalam BUY Signal Center, Coin Intelligence, Trading Journal serta Telegram FINAL READY. Simpanan Neon PostgreSQL dan pairing Telegram kekal. Rekod lama TP5 ditanda LEGACY, tidak dikira sebagai TP4.
+
+**Cara update:** Backup jurnal JSON → extract ZIP ini → upload SEMUA isi ke root GitHub `intraday` branch `main` → commit → semak Render Live → refresh app Android / PC sehingga label V1.7.2 muncul. Jangan ubah atau hantar token Telegram/Neon.
+
+## V1.7 — Telegram FINAL READY alert (berasingan daripada notifikasi browser)
 
 **Tiada order automatik.** Telegram hanya diberitahu apabila server sendiri mengira status `READY` menggunakan modul yang sama dengan BUY Signal Center (`public/signal-center-model.js`): BUY rasmi, candle 15m telah tutup dan masih segar, harga live dalam zon anti-chase, tiada False Breakout/Anti-FOMO dan timing risk bukan HIGH.
 
@@ -11,7 +17,7 @@ Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot orde
 - Telegram Bot API secara server-side (`sendMessage`, `getUpdates`); token/kod pairing **hanya** berada dalam Render Environment dan tidak dipulangkan oleh endpoint website.
 - Pairing mudah: bot `/start KOD_PAIRING` daripada Telegram peribadi, Chat ID disimpan di **PostgreSQL Neon**. Sesuai untuk satu chat Telegram sahaja. `/test` ialah mesej ujian, **bukan signal BUY**; `/status` memeriksa pairing.
 - Dedup: `symbol + timestamp candle 15m` disimpan sebagai kunci unik di PostgreSQL; satu alert per coin/candle dengan pemprosesan atomik. Gagal hantar boleh dicuba sehingga 3 kali **hanya apabila READY masih wujud**. Dalam kes jarang berlaku apabila Telegram sudah terima tetapi DB gagal mengesahkan penghantaran, alert boleh berulang; ini best effort, bukan jaminan tepat sekali.
-- Butiran mesej: symbol, masa candle MYT, harga ticker semasa ketika scan, zon rujukan, TP1 +5%/TP2 +6% bersih anggaran selepas model kos, SL −2% kasar, skor, RVOL/ADX, pautan dashboard dan amaran risiko.
+- Butiran mesej: symbol, masa candle MYT, harga ticker semasa ketika scan, zon rujukan, TP1 +4%/TP2 +6% bersih anggaran selepas model kos, SL −2% kasar, skor, RVOL/ADX, pautan dashboard dan amaran risiko.
 - Tidak memerlukan webhooks atau mendedahkan endpoint rahsia; Render Free mesti **aktif** untuk poll Telegram dan scan KuCoin. Boleh terlepas signal ketika sleep/restart. Analisis candle tertakluk kepada shortlist hingga 52 coin, bukan seluruh pasaran.
 - Jika token/kod belum diisi atau Neon terputus, server terus berfungsi untuk dashboard tetapi alert **gagal secara selamat (fail closed)**; tiada penghantaran tanpa storage dedup yang boleh dipercayai.
 
@@ -19,7 +25,7 @@ Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot orde
 
 ## Cara update daripada V1.6
 
-1. Download ZIP V1.7.1 dan extract. Backup JSON Trading Journal melalui website dahulu.
+1. Download ZIP versi terkini dan extract. Backup JSON Trading Journal melalui website dahulu.
 2. GitHub `fadhliroslan89/intraday` → branch `main` → Add file → Upload files. Upload **isi folder**, bukan ZIP sahaja, ganti fail lama dan tambah `telegram-alert.js`, `test/telegram.test.js` serta `SETUP-TELEGRAM.md`.
 3. Commit. Tunggu Render `intraday` deploy terbaru `Live`. URL website kekal sama, dan `DATABASE_URL` Neon kekal digunakan.
 4. Buat bot melalui BotFather, tambah `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_PAIR_CODE` dalam Render → Environment. Simpan dan deploy. Jangan letak kedua-duanya dalam GitHub.
@@ -36,8 +42,8 @@ Versi ini **mengekalkan sepenuhnya** engine KuCoin V1.5, PostgreSQL Neon, signal
 - Website bermula dengan **BUY Signal Center**. Senarai sebelah kiri boleh dipilih (mobile: swipe ke kiri/kanan); butiran sebelah kanan/bawah menunjukkan harga live, masa candle, skor, RVOL, ADX/RSI, pengesahan trend 1H, zon harga dan sebab status.
 - **READY** hanya jika sumber server mempunyai status `BUY` rasmi, candle segar/confirmed, tiada Anti-FOMO/false breakout, harga live dalam zon anti-chase dan timing tidak HIGH/NO_DATA/WAIT. Sebarang masalah menjadikannya WAIT / AVOID / OFFLINE. Ini **penapis tambahan pada paparan**, bukan pengubahan atau penghasilan signal BUY.
 - **WAIT** ialah calon Early / Near Buy / Watch / Qualified Watch yang belum layak. **AVOID** ialah coin bermasalah atau lemah menurut syarat semasa. Apabila tiada calon, panel akan paparkan *tiada setup* — tidak mencipta BUY palsu.
-- TP1 +5% bersih / TP2 +6% bersih dan SL −2% kasar ditunjukkan **hanya apabila READY**, dikira dengan harga ticker live sebagai **simulasi rujukan**, bukan fill/entry sebenar. Kos menggunakan model tracker 0.10% fee + 0.10% slippage per sisi. TP kosong semasa WAIT/AVOID.
-- Footer ringkas dalam panel memaparkan jumlah rekod BUY yang diperhatikan, kadar TP5 bersih jika ada data sah, dan status database.
+- TP1 +4% bersih / TP2 +6% bersih dan SL −2% kasar ditunjukkan **hanya apabila READY**, dikira dengan harga ticker live sebagai **simulasi rujukan**, bukan fill/entry sebenar. Kos menggunakan model tracker 0.10% fee + 0.10% slippage per sisi. TP kosong semasa WAIT/AVOID.
+- Footer ringkas dalam panel memaparkan jumlah rekod BUY yang diperhatikan, kadar TP4 bersih jika ada data sah, dan status database.
 - Semua panel lama (Top Opportunity, Near BUY, Early Breakout, Entry Timing, Signal Performance, Full Market Screener) dipindahkan ke seksyen **Buka analisis terperinci & panel lama** yang tertutup secara lalai. **Trading Journal** dan **Panduan** kekal pada tab atas.
 
 ### Cara update daripada V1.5
@@ -64,8 +70,8 @@ Website **bukan bot auto-buy**. READY tidak menjamin untung; harga live berubah 
 ## Signal Performance — TP bersih anggaran
 
 - Tracker terus memerhati BUY yang benar-benar diambil semasa scan candle 15m tertutup, **bukan backtest sejarah**. Tiada order dihantar dan tiada rekod fill/broker sebenar.
-- Dua kadar pergerakan **kasar** (+5%/+6%) dikekalkan dan dua penilaian **net anggaran** ditambah. Anggapan mula-mula: 0.10% fee + 0.10% slippage **setiap side** (boleh disunting pada `COST` dalam `signal-tracker.js`).
-- TP bersih +5% memerlukan kira-kira **+5.42%** pergerakan harga kasar; TP bersih +6% kira-kira **+6.42%**. SL harga kasar −2% menyebabkan kira-kira −2.39% bersih selepas kos (mengikut model kos ini). Ini hanyalah anggaran; spread, liquidity, order fill, fee sebenar dan turun naik slippage tidak dimodelkan.
+- Dua kadar pergerakan **kasar** (+4%/+6%) dikekalkan dan dua penilaian **net anggaran** ditambah. Anggapan mula-mula: 0.10% fee + 0.10% slippage **setiap side** (boleh disunting pada `COST` dalam `signal-tracker.js`).
+- TP bersih +4% memerlukan kira-kira **+4.42%** pergerakan harga kasar; TP bersih +6% kira-kira **+6.42%**. SL harga kasar −2% menyebabkan kira-kira −2.39% bersih selepas kos (mengikut model kos ini). Ini hanyalah anggaran; spread, liquidity, order fill, fee sebenar dan turun naik slippage tidak dimodelkan.
 - TP dan SL dalam candle sama dianggap `AMBIGUOUS` dan dikecualikan daripada kadar hit. Kegagalan sambungan candle dianggap `INCOMPLETE`, bukan kemenangan. `EXPIRED` selepas 24h tanpa sentuh TP/SL menggunakan bar lengkap; hanya `WIN`/`LOSS` untuk kadar hit dipaparkan. Histori terhad kepada 2000 signal terbaharu (anti-duplicate by candle).
 
 ## Simpanan sejarah signal: pilihan PostgreSQL
@@ -105,8 +111,16 @@ npm start
 Tanpa database, log mungkin memberitahu scanner gagal hubungi KuCoin jika akses API di rangkaian tempatan disekat. Dalam keadaan itu website tidak patut menganggap harga/signal offline sebagai live.
 
 
-## Android Install / PWA V1.7.1
+## Android Install / PWA V1.7.2
 
 Daily Radar kini mempunyai `public/manifest.webmanifest`, ikon PNG 192/512px, service worker (`public/sw.js`) dan halaman offline. Selepas deploy GitHub → Render, buka website melalui Chrome di Android, pilih menu tiga titik → **Add to Home screen → Install**, atau klik **Pasang App** apabila butang tersedia. Jika tab masih menunjukkan V1.6/V1.7, deployment belum terkini atau browser masih menyimpan sesi lama.
 
 **Penting:** Service worker tidak menyimpan harga, signal, API atau data dagangan. Ia hanya menyediakan halaman penerangan ketika offline, bukan scanner offline. Telegram masih memerlukan server Render aktif. Tiada APK yang diperlukan. Tidak perlu ubah DATABASE_URL/TELEGRAM_BOT_TOKEN.
+
+## V1.7.2 — Migrasi target TP1 5% → 4%
+
+- TP1 4% **bersih anggaran** selepas kos 0.10% fee + 0.10% slippage setiap sisi; TP2 kekal 6%, SL kekal −2% kasar.
+- **Penapis BUY, scoring, volatility, range 24h ≥5%, dan pemilihan shortlist 52 coin tidak dilonggarkan.**
+- Rekod signal baharu menyimpan `target1Pct:4` serta `outcome4/outcome4Net`. Rekod terdahulu tanpa `target1Pct` terus dikendalikan sebagai `target1Pct:5` (LEGACY). **Kadar TP4 hanya menggunakan rekod baharu**, bukan rekod 5% lama; TP6 masih boleh dinilai untuk kedua-dua generasi.
+- PostgreSQL Neon dan Telegram pairing sedia ada kekal, **tidak perlu cipta semula bot**. Alert lama bagi candle sama tidak dihantar semula.
+- Selepas deploy semak Telegram `/test` dan Signal Center. Tiada jaminan kenaikan 4–6% dalam sehari.

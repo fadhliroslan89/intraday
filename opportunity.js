@@ -16,7 +16,7 @@ export function assessOpportunity(c){
   const r=OPPORTUNITY_RULES, reasons=[];
   const check=(good,reason)=>{if(!good)reasons.push(reason);};
   if(!c||!c.symbol) return {qualified:false,label:'DATA TIADA',score:0,reasons:['Tiada data coin']};
-  if(isExcludedBase(c.symbol)) reasons.push('Stablecoin / aset berpatok: dikecualikan daripada sasaran 5–6%');
+  if(isExcludedBase(c.symbol)) reasons.push('Stablecoin / aset berpatok: dikecualikan daripada sasaran 4–6%');
   check(c.confirmed===true&&!c.stale,'Candle 15m belum disahkan atau lapuk');
   check(Number(c.score)>=r.minScore,`Radar Score < ${r.minScore}`);
   check(Number(c.volume24)>=r.minVolume,'Volume 24h < USDT 5 juta');

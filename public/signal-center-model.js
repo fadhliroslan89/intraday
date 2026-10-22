@@ -28,7 +28,7 @@ export function classifyCenterCoin(c, context={}){
   const label=offline?'OFFLINE':allowReady?'READY':danger?'AVOID':watch||c?.status==='BUY'?'WAIT':'AVOID';
   const why=[];
   if(offline)why.push('Data pasaran atau imbasan teknikal belum segar. Tiada entry sehingga sambungan pulih.');
-  else if(isPegged)why.push('Pasangan stablecoin / aset berpatok dikecualikan daripada strategi 5–6%.');
+  else if(isPegged)why.push('Pasangan stablecoin / aset berpatok dikecualikan daripada strategi 4–6%.');
   else if(risk.blocked)why.push('Anti-FOMO: harga sudah terlalu tinggi atau momentum memanjang.');
   else if(stage==='FALSE BREAKOUT')why.push('False breakout: candle gagal mempertahankan paras breakout.');
   else if(!closed)why.push('Candle 15m yang disahkan belum segar. Tunggu kemas kini.');

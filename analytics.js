@@ -12,7 +12,7 @@ export const CFG = Object.freeze({
   MIN_BUY_RVOL: 1.5,
   MAX_ENTRY_ABOVE_SIGNAL_PCT: 1.0,
   MAX_ENTRY_BELOW_SIGNAL_PCT: 0.5,
-  TP1: 5,
+  TP1: 4,
   TP2: 6,
   SL: 2,
   // Anti-FOMO thresholds are transparent heuristics, not an outcome prediction.
@@ -99,7 +99,7 @@ export function analyze(t, candles15, candles1h, now=Date.now()) {
   const base={...t,score:0,status:'WAIT',reasons:[],confirmed:false,lastCandle:null,
     entry:0,tp1:0,tp2:0,sl:0,timingPattern:null,rvol:0,rsi:0,adx:0,roc45:0,ema20:0,ema50:0,
     trend15:false,trend1h:false,breakout:false,breakoutLevel:0,volumeAccel:null,spark:[],setup:'Belum cukup data candle'};
-  if(isExcludedBase(t.symbol))return {...base,setup:'Stablecoin / aset berpatok tidak layak untuk screener 5–6%',reasons:['Stablecoin ditapis']};
+  if(isExcludedBase(t.symbol))return {...base,setup:'Stablecoin / aset berpatok tidak layak untuk screener 4–6%',reasons:['Stablecoin ditapis']};
   if(candles15.length<205||candles1h.length<56)return base;
   const c=candles15, h=candles1h, closes=c.map(x=>x.close), hc=h.map(x=>x.close);
   const cur=c.at(-1), prev=c.at(-2);

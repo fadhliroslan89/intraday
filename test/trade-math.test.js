@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {tradePlan} from '../public/trade-math.js';
 
-test('trade plan uses manual fill and fees for net +5 / +6 targets',()=>{
+test('trade plan uses manual fill and fees for net +4 / +6 targets',()=>{
   const p=tradePlan(0.06229,0.1);
   assert.ok(p);
   const netRoi=exit=>(exit/p.entry*(1-.001)/(1+.001)-1)*100;
-  assert.ok(Math.abs(netRoi(p.tp1Net)-5)<1e-8);
+  assert.ok(Math.abs(netRoi(p.tp1Net)-4)<1e-8);
   assert.ok(Math.abs(netRoi(p.tp2Net)-6)<1e-8);
   assert.ok(p.tp1Net>p.tp1Gross);
   assert.ok(p.tp2Net>p.tp2Gross);

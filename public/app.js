@@ -123,9 +123,9 @@ function renderSignalCenter(){
     const zoneHigh=isReady?c.entryZoneHigh:t.entryZoneHigh;
     const validZone=Number.isFinite(zoneLow)&&zoneLow>0&&Number.isFinite(zoneHigh)&&zoneHigh>=zoneLow;
     const costs=latest.signalPerformance?.costs||{};
-    const gross5=Number.isFinite(costs.requiredGross5)?costs.requiredGross5:netTargetGrossPct(5);
+    const gross4=Number.isFinite(costs.requiredGross4)?costs.requiredGross4:netTargetGrossPct(4);
     const gross6=Number.isFinite(costs.requiredGross6)?costs.requiredGross6:netTargetGrossPct(6);
-    const tp5=isReady?c.price*(1+gross5/100):null,tp6=isReady?c.price*(1+gross6/100):null;
+    const tp4=isReady?c.price*(1+gross4/100):null,tp6=isReady?c.price*(1+gross6/100):null;
     const sl=isReady?c.price*.98:null;
     const reasons=[...r.why];
     if(!isReady)for(const reason of t.riskReasons||[])if(reasons.length<4&&!reasons.includes(reason))reasons.push(reason);
@@ -135,7 +135,7 @@ function renderSignalCenter(){
     <div class="center-stats"><div><small>RADAR SCORE</small><b>${safeNum(c.score)}/100</b></div><div><small>REL. VOLUME</small><b>${safeNum(c.rvol).toFixed(2)}x</b></div><div><small>ADX / RSI</small><b>${safeNum(c.adx).toFixed(1)} / ${safeNum(c.rsi).toFixed(1)}</b></div><div><small>TIMING</small><b class="timing-string">${esc(t.stage||'—')}</b></div></div>
     <div class="center-entry-grid"><div class="center-entry-zone"><small>${isReady?'ZON ANTI-CHASE (RUJUKAN SIGNAL)':'ZON ATR (PEMANTAUAN SAHAJA)'}</small><strong>${validZone?'$'+price(zoneLow)+' – $'+price(zoneHigh):'Belum tersedia'}</strong><span>${isReady?'Live di zon: YA':`Live di zon ATR: ${t.withinZone?'YA':'TIDAK / TIADA'}`}</span></div>
     <div class="center-entry-zone"><small>CANDLE 15M DISAHKAN</small><strong>${candleClose}</strong><span>Timing risk: ${esc(t.risk||'—')} · Trend 1H: ${c.trend1h?'SEARAH':'BELUM'}</span></div></div>
-    <div class="center-targets"><div><small>TP1 · +5% NET*</small><strong class="up">${isReady?'$'+price(tp5):'—'}</strong></div><div><small>TP2 · +6% NET*</small><strong class="up">${isReady?'$'+price(tp6):'—'}</strong></div><div><small>SL · −2% KASAR*</small><strong class="down">${isReady?'$'+price(sl):'—'}</strong></div></div>
+    <div class="center-targets"><div><small>TP1 · +4% NET*</small><strong class="up">${isReady?'$'+price(tp4):'—'}</strong></div><div><small>TP2 · +6% NET*</small><strong class="up">${isReady?'$'+price(tp6):'—'}</strong></div><div><small>SL · −2% KASAR*</small><strong class="down">${isReady?'$'+price(sl):'—'}</strong></div></div>
     <div class="center-explain"><strong>${isReady?'KENAPA READY':'KENAPA BELUM READY / ELAK'}</strong><ul>${reasons.slice(0,4).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
     <div class="center-actions"><button type="button" data-open="${esc(r.symbol)}" class="center-primary">Semak 13 syarat &amp; carta ↗</button><a class="center-secondary" href="https://www.tradingview.com/chart/?symbol=KUCOIN%3A${encodeURIComponent(r.symbol.replace('-',''))}" target="_blank" rel="noopener noreferrer">TradingView ↗</a></div>
     <p class="center-target-foot">*TP/SL ialah simulasi daripada harga LIVE ketika READY, bukan harga fill. Anggaran fee 0.10% + slippage 0.10% setiap sisi; SL kasar −2%. Semak spread, struktur harga dan risiko sendiri.</p>`;
@@ -147,8 +147,8 @@ function renderSignalCenter(){
     tg.state==='WAITING PAIRING'?'Token diset. Hantar /start KOD_PAIRING kepada bot sendiri.':
     tg.state==='DATABASE REQUIRED'?'Database diperlukan untuk elakkan alert berulang.':
     'Set TELEGRAM_BOT_TOKEN dan TELEGRAM_PAIR_CODE dalam Render Environment.';
-  const perf=latest.signalPerformance||{},storage=perf.storage||{},rate=perf.tp5Net?.rate;
-  $('centerTrack').innerHTML=`<span>◉ PRESTASI SIGNAL</span><b>${perf.total||0} signal direkod</b><span>Win rate TP5 net: <strong>${Number.isFinite(rate)?rate.toFixed(1)+'%':'Belum cukup data'}</strong></span><span>${storage.persistent?'✓ Database connected':'⚠ Memory only'}</span>`;
+  const perf=latest.signalPerformance||{},storage=perf.storage||{},rate=perf.tp4Net?.rate;
+  $('centerTrack').innerHTML=`<span>◉ PRESTASI SIGNAL</span><b>${perf.total||0} signal direkod</b><span>Win rate TP4 net: <strong>${Number.isFinite(rate)?rate.toFixed(1)+'%':'Belum cukup data'}</strong></span><span>${storage.persistent?'✓ Database connected':'⚠ Memory only'}</span>`;
 }
 const positiveOrNull=v=>Number.isFinite(v)&&v>0;
 qa('[data-center-filter]').forEach(b=>b.addEventListener('click',()=>{
@@ -280,18 +280,19 @@ const outcomeLabel={PENDING:'BELUM CUKUP DATA',WIN:'TP TERSENTUH',LOSS:'SL TERSE
 function renderPerformance(){
   const perf=latest?.signalPerformance||{},stats=$('performanceStats'),list=$('performanceList'),state=$('trackerStore');
   if(!latest?.ok||latest?.summary?.dataStale){stats.innerHTML='<div class="pick-placeholder">Data offline / lapuk. Tracker tidak boleh dikemas kini.</div>';list.innerHTML='';return;}
-  const a=perf.tp5||{},b=perf.tp6||{},na=perf.tp5Net||{},nb=perf.tp6Net||{},storage=perf.storage||{};
+  const a=perf.tp4||{},b=perf.tp6||{},na=perf.tp4Net||{},nb=perf.tp6Net||{},storage=perf.storage||{};
   const persistent=storage.persistent===true,disconnected=storage.mode==='DISCONNECTED';
   state.innerHTML=`<span class="store-dot ${persistent?'on':'off'}"></span><strong>${persistent?'PERSISTENT · DATABASE CONNECTED':disconnected?'DB DISCONNECTED · HISTORY UNSAVED':'MEMORY ONLY · HISTORY NOT DURABLE'}</strong><span>${persistent?'Data sejarah disimpan dalam PostgreSQL.':disconnected?'Sambungan PostgreSQL gagal. Semak Render Logs.':'Sila set DATABASE_URL di Render → Environment untuk simpan merentas restart.'}</span>`;
   stats.innerHTML=`<div class="perf-stat"><small>BUY DICATAT ${persistent?'(DATABASE)':'(SEJAK RESTART)'}</small><strong>${perf.total||0}</strong></div>
-    <div class="perf-stat"><small>TP +5% BERSIH* · WIN/LOSS</small><strong>${na.rate===null||na.rate===undefined?'—':na.rate.toFixed(1)+'%'}</strong><span>${na.win||0} hit / ${na.loss||0} stop</span></div>
+    <div class="perf-stat"><small>TP +4% BERSIH* · WIN/LOSS</small><strong>${na.rate===null||na.rate===undefined?'—':na.rate.toFixed(1)+'%'}</strong><span>${na.win||0} hit / ${na.loss||0} stop</span></div>
     <div class="perf-stat"><small>TP +6% BERSIH* · WIN/LOSS</small><strong>${nb.rate===null||nb.rate===undefined?'—':nb.rate.toFixed(1)+'%'}</strong><span>${nb.win||0} hit / ${nb.loss||0} stop</span></div>
-    <div class="perf-stat"><small>TP 5% / 6% KASAR</small><strong>${a.rate==null?'—':a.rate.toFixed(1)+'%'} / ${b.rate==null?'—':b.rate.toFixed(1)+'%'}</strong><span>Daripada WIN / LOSS sahaja</span></div>`;
+    <div class="perf-stat"><small>TP 4% / 6% KASAR</small><strong>${a.rate==null?'—':a.rate.toFixed(1)+'%'} / ${b.rate==null?'—':b.rate.toFixed(1)+'%'}</strong><span>Daripada WIN / LOSS sahaja</span></div>`;
   const costs=perf.costs||{};
-  const assumption=`* Kos anggaran ${(costs.feePctPerSide??.1).toFixed(2)}% fee + ${(costs.slippagePctPerSide??.1).toFixed(2)}% slippage setiap side. Untuk TP bersih 5% perlu harga kasar +${safeNum(costs.requiredGross5).toFixed(2)}%; TP bersih 6% perlu +${safeNum(costs.requiredGross6).toFixed(2)}%. SL kasar −2% ≈ ${pc(costs.estimatedNetAtGrossStop,false)} bersih. Bukan fill sebenar.`;
+  const assumption=`* Kos anggaran ${(costs.feePctPerSide??.1).toFixed(2)}% fee + ${(costs.slippagePctPerSide??.1).toFixed(2)}% slippage setiap side. Untuk TP bersih 4% perlu harga kasar +${safeNum(costs.requiredGross4).toFixed(2)}%; TP bersih 6% perlu +${safeNum(costs.requiredGross6).toFixed(2)}%. SL kasar −2% ≈ ${pc(costs.estimatedNetAtGrossStop,false)} bersih. Bukan fill sebenar.`;
   const rows=perf.records||[];
-  list.innerHTML=`<div class="cost-info">${esc(assumption)}</div>`+(rows.length?`<div class="perf-list-head"><span>SEJARAH SIGNAL ${persistent?'· DATABASE':'· RAM'}</span><span>NET TP5 / NET TP6</span></div>`+
-    rows.slice(0,12).map(r=>`<div class="perf-row"><div><b>${esc(r.symbol)}</b><small>${time(r.closedAt)} · rujukan $${price(r.entry)} · skor ${r.score||0}</small></div><div><span class="outcome ${r.outcome5Net==='WIN'?'win':r.outcome5Net==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome5Net]||r.outcome5Net||'—')}</span><span class="outcome ${r.outcome6Net==='WIN'?'win':r.outcome6Net==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome6Net]||r.outcome6Net||'—')}</span></div></div>`).join(''):
+  const legacyNotice=perf.legacyCount?` Rekod lama TP5: ${perf.legacyCount} dikekalkan sebagai LEGACY dan TIDAK dimasukkan dalam statistik TP4.`:'';
+  list.innerHTML=`<div class="cost-info">${esc(assumption+legacyNotice)}</div>`+(rows.length?`<div class="perf-list-head"><span>SEJARAH SIGNAL ${persistent?'· DATABASE':'· RAM'}</span><span>NET TP1 / NET TP6</span></div>`+
+    rows.slice(0,12).map(r=>{const old=r.target1Pct!==4;const one=old?r.outcome5Net:r.outcome4Net;return `<div class="perf-row"><div><b>${esc(r.symbol)}</b><small>${time(r.closedAt)} · rujukan $${price(r.entry)} · skor ${r.score||0} · TP1 ${old?'5% LEGACY':'4%'}</small></div><div><span class="outcome ${one==='WIN'?'win':one==='LOSS'?'loss':''}">${esc(outcomeLabel[one]||one||'—')}</span><span class="outcome ${r.outcome6Net==='WIN'?'win':r.outcome6Net==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome6Net]||r.outcome6Net||'—')}</span></div></div>`;}).join(''):
     '<div class="pick-placeholder">Belum ada BUY rasmi yang sempat diperhatikan. Hit rate belum boleh dihitung tanpa rekod WIN/LOSS.</div>');
 }
 function renderTradePreview(){
@@ -301,7 +302,7 @@ function renderTradePreview(){
   if(!plan){el.innerHTML='<span class="down">Masukkan entry dan fee yang sah untuk pengiraan TP/SL.</span>';return;}
   el.innerHTML=`<div class="calculator-head">PARAS BERDASARKAN ENTRY MANUAL · YURAN ${esc(fee.toFixed(2))}% SETIAP SIDE</div>
   <div class="calculator-grid">
-    <div><small>TP1 +5% BERSIH*</small><b class="up">$${price(plan.tp1Net)}</b></div>
+    <div><small>TP1 +4% BERSIH*</small><b class="up">$${price(plan.tp1Net)}</b></div>
     <div><small>TP2 +6% BERSIH*</small><b class="up">$${price(plan.tp2Net)}</b></div>
     <div><small>STOP −2% HARGA</small><b class="down">$${price(plan.slGross)}</b></div>
     <div><small>NET JIKA STOP*</small><b class="down">${pc(plan.slNetPct,false)}</b></div>
@@ -345,7 +346,7 @@ function openDrawer(sym){
       <div class="detail-item"><small>RADAR SCORE</small><strong class="up">${c.score||0}/100</strong></div><div class="detail-item"><small>VOLUME 24H</small><strong>${compact(c.volume24)}</strong></div>
       <div class="detail-item"><small>RELATIVE VOLUME</small><strong>${c.rvol||'—'}x</strong></div><div class="detail-item"><small>RSI / ADX</small><strong>${c.rsi||'—'} / ${c.adx||'—'}</strong></div>
       <div class="detail-item"><small>24H RANGE</small><strong>${pc(c.range24,false)}</strong></div><div class="detail-item"><small>SPREAD</small><strong>${pc(c.spread,false)}</strong></div>
-      <div class="detail-item"><small>TP1 +5% KASAR †</small><strong class="up">${c.entry?'$'+price(c.tp1):'—'}</strong></div><div class="detail-item"><small>TP2 +6% KASAR †</small><strong class="up">${c.entry?'$'+price(c.tp2):'—'}</strong></div>
+      <div class="detail-item"><small>TP1 +4% KASAR †</small><strong class="up">${c.entry?'$'+price(c.tp1):'—'}</strong></div><div class="detail-item"><small>TP2 +6% KASAR †</small><strong class="up">${c.entry?'$'+price(c.tp2):'—'}</strong></div>
       <div class="detail-item"><small>RUJUKAN CANDLE †</small><strong>${c.entry?'$'+price(c.entry):'—'}</strong></div><div class="detail-item"><small>STOP −2% KASAR †</small><strong class="down">${c.entry?'$'+price(c.sl):'—'}</strong></div>
       <div class="detail-item"><small>LIVE vs CANDLE</small><strong class="${delta>=0?'up':'down'}">${deltaText}</strong></div><div class="detail-item"><small>ZON HARGA UNTUK SIGNAL BUY</small><strong>${c.entryZoneLow?'$'+price(c.entryZoneLow)+' – $'+price(c.entryZoneHigh):'—'}</strong></div>
     </div><div class="form-hint">† Paras rujukan daripada close candle 15m terakhir; ini BUKAN harga entry sebenar dan TP di atas belum ditolak fee. Zon entry ialah filter anti-chase, bukan pesanan beli. Harga live: $${price(c.price)}.</div>

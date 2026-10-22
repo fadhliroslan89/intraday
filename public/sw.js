@@ -1,5 +1,5 @@
 /* DailyRadar PWA: offline navigation shell only. NEVER cache live prices, signals, API, or notifications. */
-const OFFLINE_CACHE='daily-radar-offline-v1.7.1';
+const OFFLINE_CACHE='daily-radar-offline-v1.7.2';
 const OFFLINE_URL='/offline.html';
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(OFFLINE_CACHE).then(cache=>cache.add(OFFLINE_URL)));

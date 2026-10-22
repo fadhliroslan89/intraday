@@ -33,7 +33,7 @@ test('Sorting prioritizes READY over WAIT and counts only analyzed coins',()=>{
  assert.deepEqual([m.ready.length,m.waiting.length,m.avoided.length],[1,1,1]);
  assert.equal(m.active[0].symbol,'SOL-USDT');
 });
-test('5% net requires gross above 5% with transaction costs',()=>{
- assert.ok(netTargetGrossPct(5) > 5.4 && netTargetGrossPct(5)<5.5);
+test('4% net requires gross above 4% with transaction costs',()=>{
+ assert.ok(netTargetGrossPct(4) > 4.4 && netTargetGrossPct(4)<4.5);
  assert.ok(netTargetGrossPct(6) > 6.4 && netTargetGrossPct(6)<6.5);
 });

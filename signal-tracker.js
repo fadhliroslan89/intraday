@@ -41,8 +41,12 @@ export class SignalTracker{
       seen.add(r.id);return true;
     }).slice(0,2000).map(r=>({
       ...r,
-      outcome5Net:r.outcome5Net||'PENDING',
-      outcome6Net:r.outcome6Net||'PENDING'
+      target1Pct:r.target1Pct===4?4:5, // old records have no target marker: keep original 5% history
+      outcome4:r.target1Pct===4?(r.outcome4||'PENDING'):undefined,
+      outcome4Net:r.target1Pct===4?(r.outcome4Net||'PENDING'):undefined,
+      outcome5:r.target1Pct===4?undefined:(r.outcome5||'PENDING'),
+      outcome5Net:r.target1Pct===4?undefined:(r.outcome5Net||'PENDING'),
+      outcome6:r.outcome6||'PENDING',outcome6Net:r.outcome6Net||'PENDING'
     }));
     this.keys=new Set(this.records.map(r=>r.id));return this.records.length;
   }
@@ -58,7 +62,7 @@ export class SignalTracker{
     this.keys.add(key);
     this.records.unshift({id:key,symbol:candidate.symbol,entry:candidate.entry,
       candleTime:candidate.lastCandle,closedAt,score:candidate.score,
-      outcome5:'PENDING',outcome6:'PENDING',outcome5Net:'PENDING',outcome6Net:'PENDING',lastChecked:closedAt});
+      target1Pct:4,outcome4:'PENDING',outcome6:'PENDING',outcome4Net:'PENDING',outcome6Net:'PENDING',lastChecked:closedAt});
     if(this.records.length>2000){const dropped=this.records.splice(2000);for(const d of dropped)this.keys.delete(d.id);}
     this.onChange();return true;
   }
@@ -67,44 +71,52 @@ export class SignalTracker{
     const newest=candles.at(-1)?.time+STEP;
     let dirty=false;
     for(const rec of this.records){
-      if(rec.symbol!==symbol||['outcome5','outcome6','outcome5Net','outcome6Net'].every(k=>TERMINAL.includes(rec[k])))continue;
+      if(rec.symbol!==symbol||this.recordKeys(rec).every(k=>TERMINAL.includes(rec[k])))continue;
       const after=candles.filter(c=>c.time>=rec.closedAt);
       if(!after.length){
         if(Date.now()>rec.closedAt+TRACK_WINDOW_MS+60*60*1000){
-          for(const k of ['outcome5','outcome6','outcome5Net','outcome6Net']){
+          for(const k of this.recordKeys(rec)){
             if(rec[k]==='PENDING'){rec[k]='INCOMPLETE';dirty=true;}
           }
         }
         continue;
       }
-      const prev=[rec.outcome5,rec.outcome6,rec.outcome5Net,rec.outcome6Net].join('|');
-      rec.outcome5=evaluateSignalSide(rec,after,5,rec.outcome5);
+      const keys=this.recordKeys(rec);
+      const prev=keys.map(k=>rec[k]).join('|');
+      const one=rec.target1Pct===4?4:5;
+      rec[`outcome${one}`]=evaluateSignalSide(rec,after,one,rec[`outcome${one}`]);
       rec.outcome6=evaluateSignalSide(rec,after,6,rec.outcome6);
-      rec.outcome5Net=evaluateSignalSide(rec,after,requiredGrossPctForNet(5),rec.outcome5Net);
+      rec[`outcome${one}Net`]=evaluateSignalSide(rec,after,requiredGrossPctForNet(one),rec[`outcome${one}Net`]);
       rec.outcome6Net=evaluateSignalSide(rec,after,requiredGrossPctForNet(6),rec.outcome6Net);
-      if(prev!==[rec.outcome5,rec.outcome6,rec.outcome5Net,rec.outcome6Net].join('|'))dirty=true;
+      if(prev!==keys.map(k=>rec[k]).join('|'))dirty=true;
       rec.lastChecked=newest;
     }
     if(dirty)this.onChange();
   }
+  recordKeys(r){return r.target1Pct===4?['outcome4','outcome6','outcome4Net','outcome6Net']:
+    ['outcome5','outcome6','outcome5Net','outcome6Net'];}
   activeSymbols(){return [...new Set(this.records.filter(r=>
-    ['outcome5','outcome6','outcome5Net','outcome6Net'].some(k=>!TERMINAL.includes(r[k]))).map(r=>r.symbol))];}
+    this.recordKeys(r).some(k=>!TERMINAL.includes(r[k]))).map(r=>r.symbol))];}
   snapshot(){
-    const side=key=>{
-      const wins=this.records.filter(r=>r[key]==='WIN').length;
-      const losses=this.records.filter(r=>r[key]==='LOSS').length;
+    const side=(key, predicate=()=>true)=>{
+      const records=this.records.filter(predicate);
+      const wins=records.filter(r=>r[key]==='WIN').length;
+      const losses=records.filter(r=>r[key]==='LOSS').length;
       return {win:wins,loss:losses,
-        ambiguous:this.records.filter(r=>r[key]==='AMBIGUOUS').length,
-        incomplete:this.records.filter(r=>r[key]==='INCOMPLETE').length,
-        expired:this.records.filter(r=>r[key]==='EXPIRED').length,
-        pending:this.records.filter(r=>r[key]==='PENDING').length,
+        ambiguous:records.filter(r=>r[key]==='AMBIGUOUS').length,
+        incomplete:records.filter(r=>r[key]==='INCOMPLETE').length,
+        expired:records.filter(r=>r[key]==='EXPIRED').length,
+        pending:records.filter(r=>r[key]==='PENDING').length,
         rate:wins+losses?Math.round(wins/(wins+losses)*1000)/10:null};
     };
     return {trackingSince:this.records.at(-1)?.closedAt||null,total:this.records.length,
-      tp5:side('outcome5'),tp6:side('outcome6'),
-      tp5Net:side('outcome5Net'),tp6Net:side('outcome6Net'),
-      costs:{...COST,requiredGross5:requiredGrossPctForNet(5),requiredGross6:requiredGrossPctForNet(6),
-        estimatedNetAtGross5:estimatedNetPct(5),estimatedNetAtGross6:estimatedNetPct(6),
+      tp4:side('outcome4',r=>r.target1Pct===4),tp6:side('outcome6'),
+      tp4Net:side('outcome4Net',r=>r.target1Pct===4),tp6Net:side('outcome6Net'),
+      tp5Legacy:side('outcome5',r=>r.target1Pct!==4),
+      tp5NetLegacy:side('outcome5Net',r=>r.target1Pct!==4),
+      legacyCount:this.records.filter(r=>r.target1Pct!==4).length,
+      costs:{...COST,requiredGross4:requiredGrossPctForNet(4),requiredGross6:requiredGrossPctForNet(6),
+        estimatedNetAtGross4:estimatedNetPct(4),estimatedNetAtGross6:estimatedNetPct(6),
         estimatedNetAtGrossStop:estimatedNetPct(-2)},
       records:this.records.slice(0,35)};
   }

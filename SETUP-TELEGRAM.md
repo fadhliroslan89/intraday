@@ -45,7 +45,7 @@ Render Dashboard → Web Service `intraday` → **Environment** → Add variable
 ## 5. Alert LIVE bagaimana berfungsi?
 
 - Server akan semak semula status READY selepas imbasan candle dan refresh ticker. Hanya **FINAL READY** dihantar.
-- Mesej menghantar entry zone, harga live waktu imbasan, TP kasar yang diperlukan bagi +5/+6% net anggaran (model fee/slippage), SL dan pautan website.
+- Mesej menghantar entry zone, harga live waktu imbasan, TP kasar yang diperlukan bagi +4/+6% net anggaran (model fee/slippage), SL dan pautan website.
 - **Tidak** menghantar notifikasi untuk WAIT, AVOID, Near BUY, False Breakout, OVEREXTENDED, candle lama, atau harga di luar zon.
 - Rekod Telegram dihantar disimpan di PostgreSQL Neon untuk elak mesej berulang pada signal candle sama. Percubaan semula terhad jika Telegram API gagal. Penghantaran tepat-sekali tidak boleh dijamin pada kegagalan rangkaian/DB serentak.
 - Alert ini bukan auto-buy. Harga live ketika mesej sampai mungkin sudah di luar zon; semak semula website dan carta KuCoin/TradingView sebelum sebarang keputusan.

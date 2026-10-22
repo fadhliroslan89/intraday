@@ -40,7 +40,7 @@ test('only READY sends, once per coin+15m candle, and includes clear target/fee 
  assert.equal(await bot.check(snapshot()),0);
  assert.equal(sent.length,1);
  assert.match(sent[0].body.text,/FINAL READY/);
- assert.match(sent[0].body.text,/TP1 \(\+5% net anggaran\)/);
+ assert.match(sent[0].body.text,/TP1 \(\+4% net anggaran\)/);
  assert.match(sent[0].body.text,/bukan fill sebenar/i);
  assert.equal(store.alerts.get(alertKey(coin)).state,'SENT');
 });
