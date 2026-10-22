@@ -97,3 +97,21 @@
  .center-list-foot{display:none}
  .center-coin-list .center-empty{flex:1;min-width:0}
 }
+
+/* V1.7 FINAL READY Telegram status — credentials always server-side. */
+.telegram-panel{display:flex;align-items:center;gap:12px;border:1px solid #36516a;background:#112031;
+  padding:14px 17px;border-radius:12px;margin:16px 0 23px;color:#d7e6ef}
+.telegram-panel.tg-active{background:#132a29;border-color:#2d7865}
+.telegram-icon{font-size:24px;color:#6eb9ec;line-height:1}
+.telegram-panel div{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.telegram-panel strong{font-size:12px;letter-spacing:.4px}
+.telegram-panel small{font-size:11px;line-height:1.5;color:#a0b6c9}
+.telegram-panel button{border:1px solid #3c5b72;color:#b8e6ec;background:#1a3443;
+  padding:10px 13px;border-radius:8px;font-size:11px;font-weight:750;cursor:pointer}
+@media(max-width:620px){.telegram-panel{flex-wrap:wrap;padding:13px}.telegram-panel button{width:100%}}
+
+/* Installable Android PWA (V1.7.1) */
+.install-app-btn {background:#154539;border:1px solid #43dbad;color:#a7ffde;border-radius:10px;padding:9px 12px;white-space:nowrap;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+.install-app-btn:hover {background:#216a53;}
+.install-app-btn[hidden] {display:none!important;}
+@media(max-width:540px){.install-app-btn{font-size:11px;padding:7px 9px;}}

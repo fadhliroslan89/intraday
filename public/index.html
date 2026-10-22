@@ -4,9 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b111d" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <meta name="description" content="KuCoin Spot Daily Radar: pantau momentum, breakout, liquidity dan trend 15m/1h untuk mencari peluang 5–6% secara berdisiplin." />
   <title>Daily Radar 5–6% | KuCoin</title>
-  <link rel="stylesheet" href="/styles.css?v=1.6" />
+  <link rel="stylesheet" href="/styles.css?v=1.7.1" />
 </head>
 <body>
 <div class="app-shell">
@@ -22,6 +25,7 @@
         <button type="button" class="nav-tab" data-view="guide">Panduan</button>
       </nav>
       <div class="top-actions">
+        <button type="button" id="installAppBtn" class="install-app-btn" hidden>⬇ Pasang App</button>
         <span class="connection-pill" id="connectionPill"><i class="pulse-dot"></i><span id="connectionLabel">Menyambung</span></span>
         <button class="icon-button" type="button" id="alertsBtn" title="Aktifkan notifikasi browser" aria-label="Notifikasi">♧</button>
         <button class="icon-button" type="button" id="settingsBtn" title="Tetapan paparan" aria-label="Tetapan">⚙</button>
@@ -34,10 +38,15 @@
 
     <section class="view" id="view-radar">
       <section class="signal-center" id="signalCenter" aria-labelledby="centerTitle">
-        <div class="center-topline"><span>● UNIFIED TRADING DESK · V1.6</span><span id="centerLive">Menunggu data KuCoin...</span></div>
+        <div class="center-topline"><span>● UNIFIED TRADING DESK · V1.7.1</span><span id="centerLive">Menunggu data KuCoin...</span></div>
         <div class="center-heading">
           <div><h1 id="centerTitle">BUY <em>Signal Center</em></h1><p>Satu tempat untuk cari peluang, baca pengesahan dan semak timing. <strong>READY ialah signal untuk dinilai, bukan arahan membeli.</strong></p></div>
           <button id="centerRefresh" class="center-refresh" type="button">↻ Refresh data</button>
+        </div>
+        <div class="telegram-panel" id="telegramPanel" role="status" aria-live="polite">
+          <span class="telegram-icon">✈</span>
+          <div><strong id="telegramState">TELEGRAM · MENUNGGU STATUS</strong><small id="telegramInfo">Konfigurasi bot disimpan pada Render Environment; jangan kongsi token.</small></div>
+          <button type="button" id="telegramHelp">Cara setup ↗</button>
         </div>
         <div id="centerCounters" class="center-counters" aria-live="polite"><span>Memeriksa pasaran...</span></div>
         <div class="center-workspace">
@@ -64,7 +73,7 @@
         <div class="advanced-content">
       <div class="hero">
         <div class="hero-copy">
-          <div class="eyebrow"><span class="eyebrow-icon">✦</span> INTRADAY OPPORTUNITY ENGINE <span class="version">V1.6</span></div>
+          <div class="eyebrow"><span class="eyebrow-icon">✦</span> INTRADAY OPPORTUNITY ENGINE <span class="version">V1.7</span></div>
           <h1>Hunt the <em>5–6%</em><br/>daily move.</h1>
           <p>Lebih selektif. Kurang kejar candle. Pantau momentum, volum & breakout pada trend 15m dan 1h — untuk <strong>setup spot long sahaja.</strong></p>
           <div class="hero-subline"><span>◷ Auto refresh 30s</span><span>◇ Candle sah 15m</span><span>↗ Take Profit +5% / +6%</span></div>
@@ -92,7 +101,7 @@
 
       <section class="near-section" id="near-buy" aria-labelledby="nearBuyTitle">
         <div class="section-head">
-          <div><div class="eyebrow eyebrow-small">EARLY MOMENTUM WATCH · V1.6</div><h2 id="nearBuyTitle">Near BUY <span>radar</span></h2></div>
+          <div><div class="eyebrow eyebrow-small">EARLY MOMENTUM WATCH · V1.7.1</div><h2 id="nearBuyTitle">Near BUY <span>radar</span></h2></div>
           <span class="near-note" id="nearTime">Berdasarkan candle tertutup</span>
         </div>
         <p class="near-intro">Coin paling hampir memenuhi kriteria BUY. <strong>NEAR BUY dan EARLY bukan signal masuk.</strong> Syarat BUY rasmi tidak dilonggarkan.</p>
@@ -110,7 +119,7 @@
 
       <section class="breakout-section" id="early-breakout" aria-labelledby="breakoutTitle">
         <div class="section-head breakout-heading">
-          <div><div class="eyebrow eyebrow-small">ANTI-FOMO INTELLIGENCE · V1.6</div><h2 id="breakoutTitle">Early Breakout <span>radar</span></h2></div>
+          <div><div class="eyebrow eyebrow-small">ANTI-FOMO INTELLIGENCE · V1.7.1</div><h2 id="breakoutTitle">Early Breakout <span>radar</span></h2></div>
           <span class="near-note" id="breakoutTime">Menunggu data candle tertutup</span>
         </div>
         <p class="near-intro">Cari momentum yang <strong>belum meletup terlalu jauh</strong>. Pecutan volume ialah nisbah 3 candle tertutup terkini berbanding 3 candle sebelumnya. Ini <strong>calon pemantauan, bukan signal BUY</strong>.</p>
@@ -125,7 +134,7 @@
 
 
       <section class="timing-section" id="smart-entry" aria-labelledby="timingTitle">
-        <div class="section-head"><div><div class="eyebrow eyebrow-small">SMART ENTRY TIMING · V1.6</div><h2 id="timingTitle">Entry timing <span>&amp; trap radar</span></h2></div><span class="near-note" id="timingTime">Candle 15m tutup sahaja</span></div>
+        <div class="section-head"><div><div class="eyebrow eyebrow-small">SMART ENTRY TIMING · V1.7.1</div><h2 id="timingTitle">Entry timing <span>&amp; trap radar</span></h2></div><span class="near-note" id="timingTime">Candle 15m tutup sahaja</span></div>
         <p class="near-intro">Penapis peluang berkualiti: stablecoin dikecualikan, score sekurang-kurangnya 45, RVOL ≥1.15x, ADX ≥20, range 24H ≥4%, turnover ≥USDT5M dan spread ≤0.55%. <strong>QUALIFIED WATCH bukan BUY, zon bukan arahan entry.</strong></p>
         <div id="timingCounters" class="breakout-counters" aria-live="polite"></div>
         <div class="near-switch" role="group" aria-label="Tapisan Smart Entry Timing">
@@ -138,7 +147,7 @@
       </section>
 
       <section class="performance-section" id="signal-performance" aria-labelledby="perfTitle">
-        <div class="section-head"><div><div class="eyebrow eyebrow-small">OBSERVATION-ONLY · V1.6</div><h2 id="perfTitle">Signal <span>performance tracker</span></h2></div><span class="near-note">Tiada order dihantar</span></div>
+        <div class="section-head"><div><div class="eyebrow eyebrow-small">OBSERVATION-ONLY · V1.7.1</div><h2 id="perfTitle">Signal <span>performance tracker</span></h2></div><span class="near-note">Tiada order dihantar</span></div>
         <p class="near-intro">Signal BUY rasmi sahaja. Tracker membezakan <strong>hit harga kasar</strong> dengan <strong>TP bersih anggaran</strong> menggunakan fee 0.10% dan slippage 0.10% <em>setiap side</em>. Ini bukan rekod fill sebenar.</p>
         <div class="tracker-store" id="trackerStore" aria-live="polite">Memeriksa simpanan sejarah...</div>
         <div id="performanceStats" class="performance-stats"><div class="pick-placeholder">Belum ada data signal yang dijejak.</div></div>
@@ -182,15 +191,21 @@
 
     <section class="view hidden" id="view-guide">
       <div class="page-title"><div class="eyebrow">TRADING FRAMEWORK</div><h1>Guide & <em>strategy</em></h1><p>Bagaimana radar menilai peluang dan cara baca signal dengan lebih selamat.</p></div>
-      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">UTAMA / V1.6</span><h3>BUY Signal Center</h3><p>READY hanya apabila BUY rasmi pada candle 15m tertutup, data segar, tiada blok anti-FOMO / false breakout dan harga dalam zon anti-chase. WAIT ialah pemerhatian yang belum layak entry; AVOID ialah penolakan. TP bersih hanya simulasi daripada harga live ketika READY, bukan fill atau order. Panel lama boleh dibuka pada bahagian Analisis Terperinci.</p></div>
+      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">UTAMA / V1.7</span><h3>BUY Signal Center</h3><p>READY hanya apabila BUY rasmi pada candle 15m tertutup, data segar, tiada blok anti-FOMO / false breakout dan harga dalam zon anti-chase. WAIT ialah pemerhatian yang belum layak entry; AVOID ialah penolakan. TP bersih hanya simulasi daripada harga live ketika READY, bukan fill atau order. Panel lama boleh dibuka pada bahagian Analisis Terperinci.</p></div>
+      <div class="guide-card" id="telegramGuide" style="margin:0 0 20px"><span class="guide-num">ALERT V1.7 · TELEGRAM</span>
+        <h3>FINAL READY Alert</h3>
+        <p>Cipta bot melalui <b>@BotFather</b> → <code>/newbot</code>. Di Render → intraday → Environment, tambah <code>TELEGRAM_BOT_TOKEN</code> (token rahsia BotFather) dan <code>TELEGRAM_PAIR_CODE</code> (kod pilihan sendiri, minimum 12 aksara), kemudian Save &amp; Deploy. Dalam Telegram, buka bot sendiri dan hantar <code>/start KOD_PILIHAN_KAU</code>. Bila sudah dipasangkan, hantar <code>/test</code> untuk mesej ujian dan <code>/status</code> untuk semak sambungan. Token dan kod pairing tidak disimpan dalam kod GitHub.</p>
+        <p>Notifikasi <b>FINAL READY</b> hanya dikeluarkan bagi BUY rasmi yang melepasi semua penapis timing utama ketika scan. Satu ID setiap pasangan/candle; rekod penghantaran disimpan dalam Neon. Telegram test BUKAN signal dagangan. Server Render Free boleh tidur lalu terlepas signal.</p>
+      </div>
+      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">ANDROID · PWA V1.7.1</span><h3>Pasang DailyRadar sebagai aplikasi</h3><p>Buka website ini melalui <b>Chrome Android</b> → menu tiga titik (⋮) → <b>Add to Home screen</b> → <b>Install</b>. Jika butang <b>Pasang App</b> muncul di atas, boleh tekan terus. Selepas dipasang, DailyRadar terbuka dalam paparan aplikasi tersendiri. Jika masih muncul "Create shortcut", cuba tutup semua tab site dan buka semula selepas deployment terbaru; pastikan ikon dan manifest berjaya dimuatkan. <b>Telegram FINAL READY</b> berfungsi melalui server, bukan notifikasi PWA; Render Free yang tidur masih boleh terlepas signal. Aplikasi memerlukan internet untuk harga dan signal terkini.</p></div>
       <div class="guide-grid"><article class="guide-card"><span class="guide-num">01 / TREND</span><h3>Trend 15m + 1h</h3><p>Harga di atas EMA20 &gt; EMA50 &gt; EMA200 pada 15m; pengesahan arah 1h melalui EMA20 &gt; EMA50. Elak melawan trend utama.</p></article><article class="guide-card"><span class="guide-num">02 / MOMENTUM</span><h3>RSI + ADX</h3><p>RSI 53–70, ADX sekurang-kurangnya 22 dan momentum 45 minit positif untuk signal BUY. Terlalu panas? Radar akan kurangkan skor.</p></article><article class="guide-card"><span class="guide-num">03 / VOLUME</span><h3>Relative volume</h3><p>RVOL ≥1.5 berbanding 20 candle sebelumnya. Volum 24h ≥USDT5 juta dan spread ≤0.55% sebagai penapis asas.</p></article><article class="guide-card"><span class="guide-num">04 / BREAKOUT</span><h3>Close di atas high</h3><p>Candle 15 minit terakhir mesti tutup lebih 0.1% di atas high 20 candle sebelumnya. Signal tidak menggunakan candle yang masih berjalan.</p></article><article class="guide-card"><span class="guide-num">05 / RISK</span><h3>TP & SL berasaskan entry</h3><p>TP1 +5%, TP2 +6%, rujukan SL −2% berbanding close candle signal. Kalkulator paper trade menggunakan harga entry yang ditaip serta fee dua hala untuk anggaran TP bersih. Tiada auto-order atau jaminan.</p></article><article class="guide-card"><span class="guide-num">06 / COVERAGE</span><h3>Market vs shortlist</h3><p>Semua ticker Spot/USDT dipantau berkala. Analisis candle 15m/1h dibuat untuk shortlist dinamik sehingga 52 pasangan setiap pusingan supaya panggilan API terkawal.</p></article></div>
       <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">07 / NEAR BUY</span><h3>Near BUY & Early Momentum</h3><p>Panel tambahan menyusun calon berdasarkan 13 pemeriksaan BUY. Near BUY = sekurang-kurangnya 10/13 syarat dan skor ≥60. Early Momentum = sekurang-kurangnya 7/13 dan skor ≥40. Kedua-duanya bukan isyarat BUY. Tiada trade disahkan sehingga semua syarat asal lulus.</p></div>
-      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">08 / ANTI-FOMO V1.6</span><h3>Early Breakout, Volume Acceleration &amp; Overextended</h3><p>Early Breakout memerlukan candle tertutup, harga hampir breakout 20 candle (maks. 2.5%), RVOL ≥1.3x, pecutan volume tiga candle ≥1.10x, trend sekurang-kurangnya satu timeframe dan liquidity memadai. OVEREXTENDED menyekat calon yang telah naik ≥25% dalam 24h, ≥6% di atas EMA20, momentum 45m ≥8% atau RSI ≥76. Had ini ialah heuristik yang boleh menghasilkan false positive / false negative, bukan jaminan pergerakan +5–6%.</p></div>
-      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">09 / SMART TIMING V1.6</span><h3>Pullback, False Breakout &amp; ATR Zone</h3><p>Candle 15m yang sudah tutup digunakan untuk menentukan paras tertinggi 20 candle, breakout lepas dalam lima candle, wick rejection, ATR14 dan retest yang bertahan. Zon adalah rujukan ATR, bukan harga entry yang dijamin. False breakout disekat daripada senarai peluang, tanpa melonggarkan BUY rasmi.</p></div>
-      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">10 / PERFORMANCE V1.6</span><h3>Track signal BUY secara pemerhatian</h3><p>Server memantau selepas signal BUY berlaku. Outcome TP5 dan TP6 dikira secara berasingan menggunakan OHLC 15m, risiko stop −2% dan had 24 jam. Jika TP dan SL tersentuh pada candle sama, hasil dikira AMBIGUOUS (tidak dinilai menang). Rekod RAM akan hilang ketika server restart atau sleep; tidak sesuai untuk laporan prestasi jangka panjang.</p></div>
+      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">08 / ANTI-FOMO V1.7</span><h3>Early Breakout, Volume Acceleration &amp; Overextended</h3><p>Early Breakout memerlukan candle tertutup, harga hampir breakout 20 candle (maks. 2.5%), RVOL ≥1.3x, pecutan volume tiga candle ≥1.10x, trend sekurang-kurangnya satu timeframe dan liquidity memadai. OVEREXTENDED menyekat calon yang telah naik ≥25% dalam 24h, ≥6% di atas EMA20, momentum 45m ≥8% atau RSI ≥76. Had ini ialah heuristik yang boleh menghasilkan false positive / false negative, bukan jaminan pergerakan +5–6%.</p></div>
+      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">09 / SMART TIMING V1.7</span><h3>Pullback, False Breakout &amp; ATR Zone</h3><p>Candle 15m yang sudah tutup digunakan untuk menentukan paras tertinggi 20 candle, breakout lepas dalam lima candle, wick rejection, ATR14 dan retest yang bertahan. Zon adalah rujukan ATR, bukan harga entry yang dijamin. False breakout disekat daripada senarai peluang, tanpa melonggarkan BUY rasmi.</p></div>
+      <div class="guide-card" style="margin:0 0 20px"><span class="guide-num">10 / PERFORMANCE V1.7</span><h3>Track signal BUY secara pemerhatian</h3><p>Server memantau selepas signal BUY berlaku. Outcome TP5 dan TP6 dikira secara berasingan menggunakan OHLC 15m, risiko stop −2% dan had 24 jam. Jika TP dan SL tersentuh pada candle sama, hasil dikira AMBIGUOUS (tidak dinilai menang). Rekod signal disimpan dalam PostgreSQL Neon apabila status PERSISTENT aktif; tanpa database, rekod RAM boleh hilang ketika server restart atau sleep.</p></div>
       <div class="guide-foot"><h3>Definisi label</h3><p><strong class="up">BUY</strong> = semua tapisan ketat dipenuhi pada candle tertutup. <strong class="watch-color">WATCH</strong> = score sekurang-kurangnya 60 dan liquidity memadai, tetapi entry belum sah. <strong>WAIT</strong> = tidak layak atau data candle belum mencukupi. Skor ialah kekuatan kriteria, bukan ramalan pulangan.</p></div>
     </section>
-    <footer class="footer"><div><strong>DAILY<span>RADAR</span></strong> · V1.6</div><span>Data: KuCoin Public API · Bukan nasihat pelaburan · No auto trading</span></footer>
+    <footer class="footer"><div><strong>DAILY<span>RADAR</span></strong> · V1.7.1</div><span>Data: KuCoin Public API · Bukan nasihat pelaburan · No auto trading</span></footer>
   </main>
 </div>
 
@@ -204,6 +219,7 @@
   <div class="drawer-body"><p class="settings-intro">Ini mengubah tapisan yang anda nampak, bukan syarat signal BUY pada server.</p><label class="settings-field">Skor minimum<input type="range" id="settingsScore" min="0" max="90" step="10" value="60"/><span id="settingsScoreValue">60+</span></label><label class="settings-field">Minimum volum 24h (USDT)<select id="settingsVolume"><option value="0">Semua</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option></select></label><div class="settings-note">Candle hanya dikira untuk subset coin paling aktif; tiada data palsu atau signal BUY bila API tidak tersedia.</div><button class="primary-btn" id="saveSettings">Simpan & tutup</button></div>
 </aside>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-<script type="module" src="/app.js?v=1.6"></script>
+<script src="/pwa-install.js?v=1.7.1" defer></script>
+<script type="module" src="/app.js?v=1.7.1"></script>
 </body>
 </html>

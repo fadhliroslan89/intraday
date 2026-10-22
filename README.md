@@ -1,6 +1,33 @@
-# KuCoin Daily Radar 5–6% — Website V1.6
+# KuCoin Daily Radar 5–6% — Website V1.7.1
 
 Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot order atau jaminan keuntungan 5–6% sehari. Kekalkan URL Render dan repo GitHub `intraday` sedia ada.
+
+
+## V1.7.1 — Telegram FINAL READY alert (berasingan daripada notifikasi browser)
+
+**Tiada order automatik.** Telegram hanya diberitahu apabila server sendiri mengira status `READY` menggunakan modul yang sama dengan BUY Signal Center (`public/signal-center-model.js`): BUY rasmi, candle 15m telah tutup dan masih segar, harga live dalam zon anti-chase, tiada False Breakout/Anti-FOMO dan timing risk bukan HIGH.
+
+- Integrasi baharu: `telegram-alert.js`, halaman status di BUY Signal Center, dan ujian `test/telegram.test.js`. Semua fungsi V1.6 dan Neon kekal.
+- Telegram Bot API secara server-side (`sendMessage`, `getUpdates`); token/kod pairing **hanya** berada dalam Render Environment dan tidak dipulangkan oleh endpoint website.
+- Pairing mudah: bot `/start KOD_PAIRING` daripada Telegram peribadi, Chat ID disimpan di **PostgreSQL Neon**. Sesuai untuk satu chat Telegram sahaja. `/test` ialah mesej ujian, **bukan signal BUY**; `/status` memeriksa pairing.
+- Dedup: `symbol + timestamp candle 15m` disimpan sebagai kunci unik di PostgreSQL; satu alert per coin/candle dengan pemprosesan atomik. Gagal hantar boleh dicuba sehingga 3 kali **hanya apabila READY masih wujud**. Dalam kes jarang berlaku apabila Telegram sudah terima tetapi DB gagal mengesahkan penghantaran, alert boleh berulang; ini best effort, bukan jaminan tepat sekali.
+- Butiran mesej: symbol, masa candle MYT, harga ticker semasa ketika scan, zon rujukan, TP1 +5%/TP2 +6% bersih anggaran selepas model kos, SL −2% kasar, skor, RVOL/ADX, pautan dashboard dan amaran risiko.
+- Tidak memerlukan webhooks atau mendedahkan endpoint rahsia; Render Free mesti **aktif** untuk poll Telegram dan scan KuCoin. Boleh terlepas signal ketika sleep/restart. Analisis candle tertakluk kepada shortlist hingga 52 coin, bukan seluruh pasaran.
+- Jika token/kod belum diisi atau Neon terputus, server terus berfungsi untuk dashboard tetapi alert **gagal secara selamat (fail closed)**; tiada penghantaran tanpa storage dedup yang boleh dipercayai.
+
+**Setup langkah demi langkah:** rujuk [`SETUP-TELEGRAM.md`](SETUP-TELEGRAM.md).
+
+## Cara update daripada V1.6
+
+1. Download ZIP V1.7.1 dan extract. Backup JSON Trading Journal melalui website dahulu.
+2. GitHub `fadhliroslan89/intraday` → branch `main` → Add file → Upload files. Upload **isi folder**, bukan ZIP sahaja, ganti fail lama dan tambah `telegram-alert.js`, `test/telegram.test.js` serta `SETUP-TELEGRAM.md`.
+3. Commit. Tunggu Render `intraday` deploy terbaru `Live`. URL website kekal sama, dan `DATABASE_URL` Neon kekal digunakan.
+4. Buat bot melalui BotFather, tambah `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_PAIR_CODE` dalam Render → Environment. Simpan dan deploy. Jangan letak kedua-duanya dalam GitHub.
+5. Dari Telegram, buka bot sendiri dan hantar `/start <kod pairing>` kemudian `/test`. Website patut memaparkan **TELEGRAM · AKTIF**. Status Telegram hanya akan aktif apabila token benar, Neon bersambung dan akaun telah dipasangkan.
+
+**Ujian lokal**: `npm test`. Browser diuji dengan data simulasi; **penghantaran live ke Telegram/Neon daripada persekitaran ujian ini tidak dapat disahkan**. Semak `/test` sendiri selepas deploy.
+
+---
 
 ## V1.6 — BUY Signal Center (satu panel utama)
 
@@ -76,3 +103,10 @@ npm start
 ```
 
 Tanpa database, log mungkin memberitahu scanner gagal hubungi KuCoin jika akses API di rangkaian tempatan disekat. Dalam keadaan itu website tidak patut menganggap harga/signal offline sebagai live.
+
+
+## Android Install / PWA V1.7.1
+
+Daily Radar kini mempunyai `public/manifest.webmanifest`, ikon PNG 192/512px, service worker (`public/sw.js`) dan halaman offline. Selepas deploy GitHub → Render, buka website melalui Chrome di Android, pilih menu tiga titik → **Add to Home screen → Install**, atau klik **Pasang App** apabila butang tersedia. Jika tab masih menunjukkan V1.6/V1.7, deployment belum terkini atau browser masih menyimpan sesi lama.
+
+**Penting:** Service worker tidak menyimpan harga, signal, API atau data dagangan. Ia hanya menyediakan halaman penerangan ketika offline, bukan scanner offline. Telegram masih memerlukan server Render aktif. Tiada APK yang diperlukan. Tidak perlu ubah DATABASE_URL/TELEGRAM_BOT_TOKEN.

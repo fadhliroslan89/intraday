@@ -140,6 +140,13 @@ function renderSignalCenter(){
     <div class="center-actions"><button type="button" data-open="${esc(r.symbol)}" class="center-primary">Semak 13 syarat &amp; carta ↗</button><a class="center-secondary" href="https://www.tradingview.com/chart/?symbol=KUCOIN%3A${encodeURIComponent(r.symbol.replace('-',''))}" target="_blank" rel="noopener noreferrer">TradingView ↗</a></div>
     <p class="center-target-foot">*TP/SL ialah simulasi daripada harga LIVE ketika READY, bukan harga fill. Anggaran fee 0.10% + slippage 0.10% setiap sisi; SL kasar −2%. Semak spread, struktur harga dan risiko sendiri.</p>`;
   }
+  const tg=latest.telegram||{};
+  $('telegramPanel').classList.toggle('tg-active',!!tg.enabled);
+  $('telegramState').textContent=tg.enabled?'TELEGRAM · AKTIF':tg.configured?'TELEGRAM · BELUM AKTIF':'TELEGRAM · PERLU SETUP';
+  $('telegramInfo').textContent=tg.enabled?`Bot dipasangkan · ${tg.sent||0} alert dihantar · FINAL READY sahaja`:
+    tg.state==='WAITING PAIRING'?'Token diset. Hantar /start KOD_PAIRING kepada bot sendiri.':
+    tg.state==='DATABASE REQUIRED'?'Database diperlukan untuk elakkan alert berulang.':
+    'Set TELEGRAM_BOT_TOKEN dan TELEGRAM_PAIR_CODE dalam Render Environment.';
   const perf=latest.signalPerformance||{},storage=perf.storage||{},rate=perf.tp5Net?.rate;
   $('centerTrack').innerHTML=`<span>◉ PRESTASI SIGNAL</span><b>${perf.total||0} signal direkod</b><span>Win rate TP5 net: <strong>${Number.isFinite(rate)?rate.toFixed(1)+'%':'Belum cukup data'}</strong></span><span>${storage.persistent?'✓ Database connected':'⚠ Memory only'}</span>`;
 }
@@ -475,3 +482,8 @@ async function loadDashboard(force=false){
   }finally{busy=false;}
 }
 loadDashboard();setInterval(()=>loadDashboard(),20_000);
+
+$('telegramHelp').addEventListener('click',()=>{
+  const button=q('[data-view="guide"]');if(button)button.click();
+  setTimeout(()=>$('telegramGuide')?.scrollIntoView({behavior:'smooth',block:'start'}),60);
+});
