@@ -1,4 +1,5 @@
 import {tradePlan} from './trade-math.js';
+import {buildSignalCenter,netTargetGrossPct} from './signal-center-model.js';
 const $=id=>document.getElementById(id);
 const q=(s,root=document)=>root.querySelector(s);
 const qa=(s,root=document)=>[...root.querySelectorAll(s)];
@@ -21,6 +22,7 @@ if(!Array.isArray(trades))trades=[];
 trades=trades.filter(x=>x&&typeof x.symbol==='string'&&/^[A-Z0-9]+-USDT$/.test(x.symbol));
 let latest=null,lastDataAt=0,busy=false,seenSignals=new Set(),hasBaseline=false,selectedCoin=null,toastTimer=0;
 let nearFilter='ALL',breakoutFilter='OPPORTUNITY',timingFilter='WATCH';
+let centerFilter='ALL',centerSelected=null;
 const filters={score:$('filterScore'),volume:$('filterVolume'),range:$('filterRange'),sort:$('sortBy')};
 for(const [k,el] of Object.entries(filters))if([...el.options].some(x=>x.value===String(prefs[k])))el.value=String(prefs[k]);
 const safeSymbol=s=>/^[A-Z0-9]+-USDT$/.test(s||'')?s:'';
@@ -74,6 +76,7 @@ function render(){
     .sort((a,b)=>(a.status==='BUY'?-1:0)-(b.status==='BUY'?-1:0)||b.score-a.score).slice(0,3);
   $('topPicks').innerHTML=top.length?top.map((c,i)=>`<button type="button" class="pick-card" data-open="${esc(c.symbol)}"><div class="pick-head"><span class="pick-rank">#0${i+1} · PRIORITY</span>${badge(c.status)}</div><div class="pick-symbol">${esc(c.symbol.split('-')[0])}<span class="muted"> / USDT</span></div><div class="pick-sub">$${price(c.price)}</div><div class="pick-stats"><div><small>24H CHANGE</small><strong class="${color(c.change24)}">${pc(c.change24)}</strong></div><div><small>REL. VOL</small><strong>${c.rvol||0}x</strong></div><div><small>RADAR SCORE</small><strong class="up">${c.score}/100</strong></div></div><div class="pick-footer"><span>${esc(c.setup||'Semak setup')}</span><span class="score-bubble">ANALYZE ↗</span></div></button>`).join(''):
     `<div class="pick-placeholder">${s.candleScanRunning?'Scan candle sedang berjalan...':'Belum ada setup teknikal mencukupi. Semak senarai di bawah.'}</div>`;
+  renderSignalCenter();
   renderNear();
   renderBreakout();
   renderTiming();
@@ -86,6 +89,73 @@ function render(){
   $('journalBadge').textContent=trades.filter(t=>t.status==='OPEN').length;
   if(!q('#view-journal.hidden'))renderJournal();
 }
+function renderSignalCenter(){
+  if(!latest)return;
+  const model=buildSignalCenter(latest);
+  const filter=centerFilter;
+  const search=$('centerSearch').value.trim().toUpperCase();
+  const pool=filter==='READY'?model.ready:filter==='WAIT'?model.waiting:filter==='AVOID'?model.avoided:model.active;
+  const matching=pool.filter(x=>x.symbol.includes(search));
+  const entries=matching.slice(0,12);
+  if(!entries.some(x=>x.symbol===centerSelected))centerSelected=entries[0]?.symbol||null;
+  const primary=model.offline?'OFFLINE':model.ready.length?'READY DIKESAN':model.waiting.length?'TUNGGU SETUP':'TIADA SETUP';
+  $('centerLive').textContent=`${primary} · Data ${time(latest.summary?.updated)} MYT`;
+  $('centerCoverage').textContent=`${model.analyzed} coin dengan candle sah`;
+  $('centerCounters').innerHTML=`<div class="center-count c-ready"><small>READY · BUY SAH</small><b>${model.ready.length}</b></div>
+    <div class="center-count c-wait"><small>WAIT · PANTAU</small><b>${model.waiting.length}</b></div>
+    <div class="center-count c-avoid"><small>AVOID · DITAPIS</small><b>${model.avoided.length}</b></div>
+    <div class="center-count c-data"><small>CAKUPAN CARTA</small><b>${model.analyzed}<span> / ${latest.summary?.totalPairs||0}</span></b></div>`;
+  $('centerCoinList').innerHTML=entries.length?entries.map((r,i)=>{
+    const c=r.coin;
+    return `<button type="button" class="center-coin ${r.symbol===centerSelected?'active':''}" data-center-select="${esc(r.symbol)}" aria-pressed="${r.symbol===centerSelected}">
+       <div class="center-coin-symbol"><b>${esc(r.symbol.replace('-USDT',''))}<small>/USDT</small></b><span class="center-state ${r.label.toLowerCase()}">${r.label}</span></div>
+       <div class="center-coin-info"><span>$${price(c.price)}</span><span class="${color(c.change24)}">${pc(c.change24)} 24H</span></div>
+       <div class="center-coin-metrics"><span>Score <b>${safeNum(c.score)}/100</b></span><span>RVOL <b>${safeNum(c.rvol).toFixed(2)}x</b></span><span>ADX <b>${safeNum(c.adx).toFixed(1)}</b></span></div>
+     </button>`;
+  }).join(''):
+    `<div class="center-empty">${model.offline?'Data pasaran belum segar. Tiada status READY boleh dipercayai.':filter==='ALL'?'Tiada READY atau WAIT berkualiti sekarang. Jangan paksa entry; semak AVOID untuk audit.':'Tiada coin dalam kategori ini buat masa ini.'}</div>`;
+  const selected=entries.find(x=>x.symbol===centerSelected);
+  if(!selected){$('centerDetail').innerHTML=`<div class="center-detail-empty"><div class="center-big-symbol">${model.offline?'DATA OFFLINE':'TIADA ENTRY'}</div><p>${model.offline?'Tunggu sambungan KuCoin dan analisis candle pulih.':'Belum ada setup yang layak dalam penapis ini. Kekalkan disiplin dan jangan paksa trade.'}</p></div>`;}
+  else{
+    const r=selected,c=r.coin,t=c.smartTiming||{},risk=c.breakoutRadar?.risk||{},isReady=r.label==='READY';
+    const candleClose=positiveOrNull(c.lastCandle)?time(c.lastCandle+900000)+' MYT':'—';
+    const zoneLow=isReady?c.entryZoneLow:t.entryZoneLow;
+    const zoneHigh=isReady?c.entryZoneHigh:t.entryZoneHigh;
+    const validZone=Number.isFinite(zoneLow)&&zoneLow>0&&Number.isFinite(zoneHigh)&&zoneHigh>=zoneLow;
+    const costs=latest.signalPerformance?.costs||{};
+    const gross5=Number.isFinite(costs.requiredGross5)?costs.requiredGross5:netTargetGrossPct(5);
+    const gross6=Number.isFinite(costs.requiredGross6)?costs.requiredGross6:netTargetGrossPct(6);
+    const tp5=isReady?c.price*(1+gross5/100):null,tp6=isReady?c.price*(1+gross6/100):null;
+    const sl=isReady?c.price*.98:null;
+    const reasons=[...r.why];
+    if(!isReady)for(const reason of t.riskReasons||[])if(reasons.length<4&&!reasons.includes(reason))reasons.push(reason);
+    const statusTitle=isReady?'BUY rasmi disahkan — semak risiko sebelum buat keputusan':r.label==='WAIT'?'Tunggu pengesahan — BELUM BUY':'Tidak sesuai untuk entry berdasarkan penapis sekarang';
+    $('centerDetail').innerHTML=`<div class="center-detail-head"><div><span class="center-detail-eyebrow">TRADE DECISION · SPOT</span><h2>${esc(r.symbol)}</h2><div class="center-live-price">$${price(c.price)} <span class="${color(c.change24)}">${pc(c.change24)} / 24H</span></div></div><span class="center-state large ${r.label.toLowerCase()}">${r.label}</span></div>
+    <div class="center-guidance ${r.label.toLowerCase()}"><strong>${esc(statusTitle)}</strong><small>${isReady?'Status berdasarkan BUY rasmi, candle disahkan dan harga dalam zon. Bukan order automatik.':r.label==='WAIT'?'Jangan entry selagi belum ada BUY rasmi dan zon live sesuai.':'Jangan gunakan coin ini sebagai entry semasa.'}</small></div>
+    <div class="center-stats"><div><small>RADAR SCORE</small><b>${safeNum(c.score)}/100</b></div><div><small>REL. VOLUME</small><b>${safeNum(c.rvol).toFixed(2)}x</b></div><div><small>ADX / RSI</small><b>${safeNum(c.adx).toFixed(1)} / ${safeNum(c.rsi).toFixed(1)}</b></div><div><small>TIMING</small><b class="timing-string">${esc(t.stage||'—')}</b></div></div>
+    <div class="center-entry-grid"><div class="center-entry-zone"><small>${isReady?'ZON ANTI-CHASE (RUJUKAN SIGNAL)':'ZON ATR (PEMANTAUAN SAHAJA)'}</small><strong>${validZone?'$'+price(zoneLow)+' – $'+price(zoneHigh):'Belum tersedia'}</strong><span>${isReady?'Live di zon: YA':`Live di zon ATR: ${t.withinZone?'YA':'TIDAK / TIADA'}`}</span></div>
+    <div class="center-entry-zone"><small>CANDLE 15M DISAHKAN</small><strong>${candleClose}</strong><span>Timing risk: ${esc(t.risk||'—')} · Trend 1H: ${c.trend1h?'SEARAH':'BELUM'}</span></div></div>
+    <div class="center-targets"><div><small>TP1 · +5% NET*</small><strong class="up">${isReady?'$'+price(tp5):'—'}</strong></div><div><small>TP2 · +6% NET*</small><strong class="up">${isReady?'$'+price(tp6):'—'}</strong></div><div><small>SL · −2% KASAR*</small><strong class="down">${isReady?'$'+price(sl):'—'}</strong></div></div>
+    <div class="center-explain"><strong>${isReady?'KENAPA READY':'KENAPA BELUM READY / ELAK'}</strong><ul>${reasons.slice(0,4).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
+    <div class="center-actions"><button type="button" data-open="${esc(r.symbol)}" class="center-primary">Semak 13 syarat &amp; carta ↗</button><a class="center-secondary" href="https://www.tradingview.com/chart/?symbol=KUCOIN%3A${encodeURIComponent(r.symbol.replace('-',''))}" target="_blank" rel="noopener noreferrer">TradingView ↗</a></div>
+    <p class="center-target-foot">*TP/SL ialah simulasi daripada harga LIVE ketika READY, bukan harga fill. Anggaran fee 0.10% + slippage 0.10% setiap sisi; SL kasar −2%. Semak spread, struktur harga dan risiko sendiri.</p>`;
+  }
+  const perf=latest.signalPerformance||{},storage=perf.storage||{},rate=perf.tp5Net?.rate;
+  $('centerTrack').innerHTML=`<span>◉ PRESTASI SIGNAL</span><b>${perf.total||0} signal direkod</b><span>Win rate TP5 net: <strong>${Number.isFinite(rate)?rate.toFixed(1)+'%':'Belum cukup data'}</strong></span><span>${storage.persistent?'✓ Database connected':'⚠ Memory only'}</span>`;
+}
+const positiveOrNull=v=>Number.isFinite(v)&&v>0;
+qa('[data-center-filter]').forEach(b=>b.addEventListener('click',()=>{
+  centerFilter=b.dataset.centerFilter;
+  qa('[data-center-filter]').forEach(x=>x.classList.toggle('chosen',x.dataset.centerFilter===centerFilter));
+  centerSelected=null;renderSignalCenter();
+}));
+$('centerSearch').addEventListener('input',()=>{centerSelected=null;renderSignalCenter();});
+$('centerCoinList').addEventListener('click',e=>{
+  const el=e.target.closest('[data-center-select]');if(!el)return;
+  centerSelected=el.dataset.centerSelect;renderSignalCenter();
+});
+$('centerRefresh').addEventListener('click',()=>{loadDashboard(true);toast('Memuat data live...');});
+
 function renderReadinessCard(c, i){
   const r=c.readiness||{},near=r.level==='NEAR BUY',early=r.level==='EARLY';
   const kind=near?'NEAR BUY':early?'EARLY MOMENTUM':'MONITOR SAHAJA';

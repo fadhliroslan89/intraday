@@ -1,6 +1,31 @@
-# KuCoin Daily Radar 5–6% — Website V1.5
+# KuCoin Daily Radar 5–6% — Website V1.6
 
 Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot order atau jaminan keuntungan 5–6% sehari. Kekalkan URL Render dan repo GitHub `intraday` sedia ada.
+
+## V1.6 — BUY Signal Center (satu panel utama)
+
+Versi ini **mengekalkan sepenuhnya** engine KuCoin V1.5, PostgreSQL Neon, signal tracker, journal manual dan peraturan BUY; ia menambah satu panel utama sahaja serta modul pembentangan keputusan (`public/signal-center-model.js`).
+
+- Website bermula dengan **BUY Signal Center**. Senarai sebelah kiri boleh dipilih (mobile: swipe ke kiri/kanan); butiran sebelah kanan/bawah menunjukkan harga live, masa candle, skor, RVOL, ADX/RSI, pengesahan trend 1H, zon harga dan sebab status.
+- **READY** hanya jika sumber server mempunyai status `BUY` rasmi, candle segar/confirmed, tiada Anti-FOMO/false breakout, harga live dalam zon anti-chase dan timing tidak HIGH/NO_DATA/WAIT. Sebarang masalah menjadikannya WAIT / AVOID / OFFLINE. Ini **penapis tambahan pada paparan**, bukan pengubahan atau penghasilan signal BUY.
+- **WAIT** ialah calon Early / Near Buy / Watch / Qualified Watch yang belum layak. **AVOID** ialah coin bermasalah atau lemah menurut syarat semasa. Apabila tiada calon, panel akan paparkan *tiada setup* — tidak mencipta BUY palsu.
+- TP1 +5% bersih / TP2 +6% bersih dan SL −2% kasar ditunjukkan **hanya apabila READY**, dikira dengan harga ticker live sebagai **simulasi rujukan**, bukan fill/entry sebenar. Kos menggunakan model tracker 0.10% fee + 0.10% slippage per sisi. TP kosong semasa WAIT/AVOID.
+- Footer ringkas dalam panel memaparkan jumlah rekod BUY yang diperhatikan, kadar TP5 bersih jika ada data sah, dan status database.
+- Semua panel lama (Top Opportunity, Near BUY, Early Breakout, Entry Timing, Signal Performance, Full Market Screener) dipindahkan ke seksyen **Buka analisis terperinci & panel lama** yang tertutup secara lalai. **Trading Journal** dan **Panduan** kekal pada tab atas.
+
+### Cara update daripada V1.5
+
+1. Sebagai langkah berjaga-jaga, lakukan Trading Journal → **Backup JSON** dahulu.
+2. Extract `KuCoin_Daily_Radar_Website_v1.6.zip` dan upload **semua fail & folder kandungannya** ke root repository GitHub `intraday` di branch `main`, menimpa versi sebelumnya. Jangan upload ZIP sahaja.
+3. Fail penting baharu ialah `public/signal-center-model.js`, bersama `public/app.js`, `public/index.html`, `public/styles.css`, `test/signal-center.test.js` yang dikemas kini. Pastikan file baharu berada dalam `public/` tepat seperti susunan ZIP.
+4. Render auto deploy jika diaktifkan. Jika tidak, **Manual Deploy → Deploy latest commit**. URL Render dan pemboleh ubah `DATABASE_URL` di Render kekal; jangan isi rahsia dalam GitHub.
+5. Refresh website dan pastikan label **V1.6** serta **BUY Signal Center** muncul. Semak status database & satu coin WATCH/READY pada paparan sebenar. Data KuCoin live dan Neon tidak boleh disahkan dalam ujian offline kami.
+
+### Perkara penting
+
+Website **bukan bot auto-buy**. READY tidak menjamin untung; harga live berubah dan sasaran kasar/bersih berbeza. Statistik Signal Performance ialah pengamatan signal dari imbasan server, bukan prestasi transaksi pengguna. Render Free boleh tidur dan terlepas peluang. Kami menguji unit + browser **dengan data simulasi**, bukan kadar kejayaan pasaran sebenar.
+
+---
 
 ## Perubahan V1.5 — Opportunity Quality Filter
 
