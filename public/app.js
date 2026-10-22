@@ -171,14 +171,14 @@ qa('[data-near-filter]').forEach(b=>b.addEventListener('click',()=>{
 
 // V1.4: Distinct from BUY. Only fresh, confirmed closed-candle interpretations.
 function renderTimingCard(c){
-  const t=c.smartTiming||{},trap=t.stage==='FALSE BREAKOUT';
+  const t=c.smartTiming||{},trap=t.stage==='FALSE BREAKOUT',filtered=c.opportunity?.qualified===false;
   const stage=t.stage||'WAIT',risk=t.risk||'HIGH';
   const level=Number.isFinite(t.level)?'$'+price(t.level):'—';
   const zone=Number.isFinite(t.entryZoneLow)&&Number.isFinite(t.entryZoneHigh)
     ?`$${price(t.entryZoneLow)} – $${price(t.entryZoneHigh)}`:'Tiada (tunggu struktur baharu)';
-  const notes=(t.notes||[]).concat((t.riskReasons||[]).slice(0,2)).slice(0,4).map(x=>`<li>${esc(x)}</li>`).join('');
+  const notes=(filtered?(c.opportunity?.reasons||[]):(t.notes||[]).concat((t.riskReasons||[]).slice(0,2))).slice(0,4).map(x=>`<li>${esc(x)}</li>`).join('');
   return `<button class="timing-card ${trap?'timing-trap':''}" type="button" data-open="${esc(c.symbol)}" aria-label="Smart timing ${esc(c.symbol)}">
-    <div class="timing-card-top"><span class="timing-stage ${trap?'trap':''}">${esc(stage)}</span><span class="timing-risk ${risk==='HIGH'?'high':risk==='MEDIUM'?'medium':'low'}">RISIKO ${esc(risk)}</span></div>
+    <div class="timing-card-top"><span class="timing-stage ${trap?'trap':''}">${esc(stage)}</span><span class="timing-risk ${filtered?'high':risk==='HIGH'?'high':risk==='MEDIUM'?'medium':'low'}">${filtered?'TIDAK LULUS':`RISIKO ${esc(risk)}`}</span></div>
     <div class="timing-symbol"><strong>${esc(c.symbol.split('-')[0])}<small>/USDT</small></strong><span>$${price(c.price)}</span></div>
     <div class="timing-metrics"><div><small>SCORE ASAL</small><b>${c.score||0}/100</b></div><div><small>RVOL</small><b>${safeNum(c.rvol).toFixed(2)}x</b></div><div><small>ATR14</small><b>${Number.isFinite(t.atrPct)?pc(t.atrPct,false):'—'}</b></div><div><small>LIVE DALAM ZON</small><b>${t.withinZone?'YA':'TIDAK'}</b></div></div>
     <div class="timing-zone"><small>RESISTANCE RUJUKAN</small><b>${level}</b><small>ZON ATR (BUKAN ENTRY AUTOMATIK)</small><b>${zone}</b></div>
@@ -188,11 +188,11 @@ function renderTimingCard(c){
 function renderTiming(){
   const cards=$('timingCards'),ct=$('timingCounters'),clock=$('timingTime');
   if(!latest?.ok||latest?.summary?.dataStale){cards.innerHTML='<div class="pick-placeholder">Data live lapuk / offline; signal timing disembunyikan.</div>';ct.textContent='';return;}
-  const s=latest.summary||{},good=latest.timingCandidates||[],bad=latest.timingWarnings||[];
-  ct.innerHTML=`<span class="breakout-counter">◈ WATCH TIMING <strong>${s.timingCount||0}</strong></span><span class="breakout-counter red">⛔ FALSE BREAKOUT <strong>${s.falseBreakoutCount||0}</strong></span>`;
+  const s=latest.summary||{},good=latest.timingCandidates||[],rejected=latest.timingRejected||[],bad=latest.timingWarnings||[];
+  ct.innerHTML=`<span class="breakout-counter">✓ QUALIFIED <strong>${s.timingCount||0}</strong></span><span class="breakout-counter red">× DITAPIS <strong>${s.filteredCount||0}</strong></span><span class="breakout-counter red">⛔ FALSE BREAKOUT <strong>${s.falseBreakoutCount||0}</strong></span><span class="breakout-counter">STABLECOIN EXCLUDED <strong>${s.stablecoinExcluded||0}</strong></span>`;
   clock.textContent=s.analyzedAt?'Scan: '+time(s.analyzedAt)+' MYT':'Menunggu analisis';
-  const selected=timingFilter==='TRAP'?bad:good;
-  cards.innerHTML=selected.length?selected.map(renderTimingCard).join(''):`<div class="pick-placeholder">${s.candleScanRunning?'Sedang mengimbas candle...':timingFilter==='TRAP'?'Tiada breakout palsu dikesan dalam shortlist semasa.':'Belum ada calon timing yang layak dipantau sekarang.'}</div>`;
+  const selected=timingFilter==='TRAP'?bad:timingFilter==='REJECTED'?rejected:good;
+  cards.innerHTML=selected.length?selected.map(renderTimingCard).join(''):`<div class="pick-placeholder">${s.candleScanRunning?'Sedang mengimbas candle...':timingFilter==='TRAP'?'Tiada breakout palsu dikesan.':timingFilter==='REJECTED'?'Tiada coin ditapis pada scan ini.':'Tiada calon berkualiti yang lulus penapis sekarang. Tiada keperluan untuk paksa entry.'}</div>`;
 }
 qa('[data-timing-filter]').forEach(b=>b.addEventListener('click',()=>{
   timingFilter=b.dataset.timingFilter;
@@ -201,19 +201,22 @@ qa('[data-timing-filter]').forEach(b=>b.addEventListener('click',()=>{
 }));
 const outcomeLabel={PENDING:'BELUM CUKUP DATA',WIN:'TP TERSENTUH',LOSS:'SL TERSENTUH',AMBIGUOUS:'TIDAK PASTI',EXPIRED:'TIADA TP / SL 24H',INCOMPLETE:'DATA TERPUTUS'};
 function renderPerformance(){
-  const perf=latest?.signalPerformance||{},stats=$('performanceStats'),list=$('performanceList');
+  const perf=latest?.signalPerformance||{},stats=$('performanceStats'),list=$('performanceList'),state=$('trackerStore');
   if(!latest?.ok||latest?.summary?.dataStale){stats.innerHTML='<div class="pick-placeholder">Data offline / lapuk. Tracker tidak boleh dikemas kini.</div>';list.innerHTML='';return;}
-  const a=perf.tp5||{},b=perf.tp6||{};
-  stats.innerHTML=`<div class="perf-stat"><small>BUY DICATAT (SEJAK RESTART)</small><strong>${perf.total||0}</strong></div>
-    <div class="perf-stat"><small>TP +5% · DARIPADA MENANG/KALAH</small><strong>${a.rate===null||a.rate===undefined?'—':a.rate.toFixed(1)+'%'}</strong><span>${a.win||0} hit / ${a.loss||0} stop</span></div>
-    <div class="perf-stat"><small>TP +6% · DARIPADA MENANG/KALAH</small><strong>${b.rate===null||b.rate===undefined?'—':b.rate.toFixed(1)+'%'}</strong><span>${b.win||0} hit / ${b.loss||0} stop</span></div>
-    <div class="perf-stat"><small>AMBIGUOUS / PENDING (TP5)</small><strong>${(a.ambiguous||0)} / ${(a.pending||0)}</strong></div>`;
+  const a=perf.tp5||{},b=perf.tp6||{},na=perf.tp5Net||{},nb=perf.tp6Net||{},storage=perf.storage||{};
+  const persistent=storage.persistent===true,disconnected=storage.mode==='DISCONNECTED';
+  state.innerHTML=`<span class="store-dot ${persistent?'on':'off'}"></span><strong>${persistent?'PERSISTENT · DATABASE CONNECTED':disconnected?'DB DISCONNECTED · HISTORY UNSAVED':'MEMORY ONLY · HISTORY NOT DURABLE'}</strong><span>${persistent?'Data sejarah disimpan dalam PostgreSQL.':disconnected?'Sambungan PostgreSQL gagal. Semak Render Logs.':'Sila set DATABASE_URL di Render → Environment untuk simpan merentas restart.'}</span>`;
+  stats.innerHTML=`<div class="perf-stat"><small>BUY DICATAT ${persistent?'(DATABASE)':'(SEJAK RESTART)'}</small><strong>${perf.total||0}</strong></div>
+    <div class="perf-stat"><small>TP +5% BERSIH* · WIN/LOSS</small><strong>${na.rate===null||na.rate===undefined?'—':na.rate.toFixed(1)+'%'}</strong><span>${na.win||0} hit / ${na.loss||0} stop</span></div>
+    <div class="perf-stat"><small>TP +6% BERSIH* · WIN/LOSS</small><strong>${nb.rate===null||nb.rate===undefined?'—':nb.rate.toFixed(1)+'%'}</strong><span>${nb.win||0} hit / ${nb.loss||0} stop</span></div>
+    <div class="perf-stat"><small>TP 5% / 6% KASAR</small><strong>${a.rate==null?'—':a.rate.toFixed(1)+'%'} / ${b.rate==null?'—':b.rate.toFixed(1)+'%'}</strong><span>Daripada WIN / LOSS sahaja</span></div>`;
+  const costs=perf.costs||{};
+  const assumption=`* Kos anggaran ${(costs.feePctPerSide??.1).toFixed(2)}% fee + ${(costs.slippagePctPerSide??.1).toFixed(2)}% slippage setiap side. Untuk TP bersih 5% perlu harga kasar +${safeNum(costs.requiredGross5).toFixed(2)}%; TP bersih 6% perlu +${safeNum(costs.requiredGross6).toFixed(2)}%. SL kasar −2% ≈ ${pc(costs.estimatedNetAtGrossStop,false)} bersih. Bukan fill sebenar.`;
   const rows=perf.records||[];
-  list.innerHTML=rows.length?`<div class="perf-list-head"><span>SEJARAH SIGNAL · SERVER MEMORY</span><span>TP+5% / TP+6%</span></div>`+
-    rows.slice(0,10).map(r=>`<div class="perf-row"><div><b>${esc(r.symbol)}</b><small>${time(r.closedAt)} · rujukan $${price(r.entry)} · skor ${r.score||0}</small></div><div><span class="outcome ${r.outcome5==='WIN'?'win':r.outcome5==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome5]||r.outcome5)}</span><span class="outcome ${r.outcome6==='WIN'?'win':r.outcome6==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome6]||r.outcome6)}</span></div></div>`).join(''):
-    '<div class="pick-placeholder">Belum ada signal BUY baharu yang dapat direkodkan sejak server ini bermula. Ini normal dengan syarat BUY yang ketat.</div>';
+  list.innerHTML=`<div class="cost-info">${esc(assumption)}</div>`+(rows.length?`<div class="perf-list-head"><span>SEJARAH SIGNAL ${persistent?'· DATABASE':'· RAM'}</span><span>NET TP5 / NET TP6</span></div>`+
+    rows.slice(0,12).map(r=>`<div class="perf-row"><div><b>${esc(r.symbol)}</b><small>${time(r.closedAt)} · rujukan $${price(r.entry)} · skor ${r.score||0}</small></div><div><span class="outcome ${r.outcome5Net==='WIN'?'win':r.outcome5Net==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome5Net]||r.outcome5Net||'—')}</span><span class="outcome ${r.outcome6Net==='WIN'?'win':r.outcome6Net==='LOSS'?'loss':''}">${esc(outcomeLabel[r.outcome6Net]||r.outcome6Net||'—')}</span></div></div>`).join(''):
+    '<div class="pick-placeholder">Belum ada BUY rasmi yang sempat diperhatikan. Hit rate belum boleh dihitung tanpa rekod WIN/LOSS.</div>');
 }
-
 function renderTradePreview(){
   const el=$('paperTradePreview');if(!el)return;
   const entry=Number($('journalEntry')?.value),fee=Number($('journalFee')?.value);
@@ -252,7 +255,8 @@ function openDrawer(sym){
     <div class="detail-graph">${graph(points)}</div><div class="mobile-row">${badge(c.status)}<span class="muted">Candle tutup: ${c.lastCandle?time(c.lastCandle+900000):'—'}</span></div>
     ${warning}
     ${riskBox}
-    <div class="timing-drawer"><h3>SMART ENTRY TIMING · V1.4</h3>
+    <div class="quality-detail"><strong>OPPORTUNITY QUALITY · ${esc(c.opportunity?.label||'BELUM DINILAI')}</strong><p>${c.opportunity?.qualified?'Lulus penapis pemerhatian. Ini bukan arahan BUY.':esc((c.opportunity?.reasons||['Data tidak lengkap']).slice(0,7).join(' • '))}</p></div>
+    <div class="timing-drawer"><h3>SMART ENTRY TIMING · V1.5</h3>
       <div class="timing-drawer-kpis"><span>Status: <strong>${esc(c.smartTiming?.stage||'NO DATA')}</strong></span><span>Risk: <strong>${esc(c.smartTiming?.risk||'HIGH')}</strong></span></div>
       <p>${esc((c.smartTiming?.notes||['Data candle tidak cukup']).join(' • '))}</p>
       <div class="form-hint">Resistance: ${Number.isFinite(c.smartTiming?.level)?'$'+price(c.smartTiming.level):'—'} · Zon ATR: ${Number.isFinite(c.smartTiming?.entryZoneLow)?'$'+price(c.smartTiming.entryZoneLow)+' – $'+price(c.smartTiming.entryZoneHigh):'Tiada'} · ${c.smartTiming?.withinZone?'Harga live dalam zon':'Harga live di luar zon / zon tidak tersedia'}</div>

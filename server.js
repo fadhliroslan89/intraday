@@ -43,7 +43,13 @@ server.listen(PORT,'0.0.0.0',()=>console.log(`Daily Radar ready :${PORT}`));
 let tickerBusy=false;
 async function refreshTickers(){if(tickerBusy)return;tickerBusy=true;try{await market.updateTickers();}finally{tickerBusy=false;}}
 async function refreshTechnicals(){try{await market.updateAnalysis();}catch(e){console.error('Analysis',e);}}
-refreshTickers().then(()=>refreshTechnicals());
-setInterval(refreshTickers,30_000);
-setInterval(refreshTechnicals,120_000);
-process.on('SIGTERM',()=>server.close(()=>process.exit(0)));
+async function bootstrap(){
+  await market.initStorage();
+  await refreshTickers();
+  await refreshTechnicals();
+  setInterval(()=>void market.reconnectStorage().catch(e=>console.error('DB reconnection:',e)),60_000);
+  setInterval(refreshTickers,30_000);
+  setInterval(refreshTechnicals,120_000);
+}
+void bootstrap().catch(e=>console.error('Bootstrap:',e));
+process.on('SIGTERM',()=>server.close(async()=>{await market.shutdown();process.exit(0);}));

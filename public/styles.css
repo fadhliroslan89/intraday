@@ -61,3 +61,12 @@
 .timing-drawer{padding:16px;background:#102838;border:1px solid #366072;border-radius:12px;margin:16px 0}.timing-drawer h3{font-size:14px;letter-spacing:.2px}.timing-drawer p{font-size:12px;color:#acc8d5}.timing-drawer-kpis{display:flex;flex-wrap:wrap;gap:14px;font-size:12px}.timing-drawer-kpis strong{color:#5ce9b9}.timing-drawer-warnings{color:#edb698!important}
 @media(max-width:1100px){.timing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.performance-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.timing-section,.performance-section{padding:15px 12px;margin:28px 0}.timing-grid,.performance-stats{grid-template-columns:1fr}.timing-card{padding:15px}.perf-row{align-items:flex-start;flex-direction:column}.perf-row>div:last-child{justify-content:flex-start}.perf-stat small{min-height:auto}.perf-stat{padding:12px}}
+
+/* V1.5 Opportunity Quality & durable signal indicators */
+.tracker-store{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #315366;border-radius:10px;padding:11px 15px;color:#bacbd8;font-size:11px;background:#132435;margin-top:15px}
+.tracker-store strong{font-size:11px;color:#e1f7ed}.tracker-store span:last-child{color:#a7b9c7}
+.store-dot{height:9px;width:9px;background:#ff8b9d;border-radius:50%;flex-shrink:0}.store-dot.on{background:#55eab6}
+.quality-detail{border:1px solid #386176;background:#10293a;padding:13px 15px;border-radius:10px;margin-top:12px}
+.quality-detail strong{font-size:11px;color:#60e6c4}.quality-detail p{font-size:12px;color:#b1cbd8;line-height:1.65}
+.cost-info{background:#142b39;color:#b1c8d7;font-size:11px;padding:13px 16px;line-height:1.6}
+@media(max-width:650px){.tracker-store{align-items:flex-start;gap:7px}.cost-info{font-size:10px}}

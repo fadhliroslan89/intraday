@@ -1,6 +1,8 @@
+import {assessOpportunity,isExcludedBase} from './opportunity.js';
+import {SignalStore} from './signal-store.js';
 import {assessEntryTiming} from './timing.js';
 import {SignalTracker} from './signal-tracker.js';
-import {CFG, normalizeTicker, parseCandles, analyze, chooseCandidates, round, assessReadiness, assessBreakout} from './analytics.js';
+import {CFG, normalizeTicker, parseCandles, analyze, chooseCandidates, round, assessReadiness, assessBreakout, classifyFomo} from './analytics.js';
 const HOST='https://api.kucoin.com';
 const HEADERS={'User-Agent':'KuCoin-Daily-Radar/1.0','Accept':'application/json'};
 const intervalMs={ '15min':900_000, '1hour':3_600_000 };
@@ -24,7 +26,51 @@ export class Market {
     this.tickers=[];this.analysis=new Map();this.cache=new Map();this.lastTicker=0;
     this.lastTechnical=0;this.scanRunning=false;this.nextRotation=0;this.error='';
     this.startTime=Date.now();this.totalSymbols=0;this.lastRunCandidate=0;
-    this.symSet=null;this.nextMeta=0;this.signalTracker=new SignalTracker();
+    this.symSet=null;this.nextMeta=0;this.store=new SignalStore();
+    this.pendingSave=null;this.saving=false;this.dirty=false;this.storageBusy=false;
+    this.signalTracker=new SignalTracker(()=>this.scheduleSignalSave());
+  }
+  async initStorage(){
+    await this.reconnectStorage();
+  }
+  async reconnectStorage(){
+    if(this.storageBusy||!this.store.url||this.store.mode==='PERSISTENT')return;
+    this.storageBusy=true;
+    try{
+      const saved=await this.store.connect();
+      if(this.store.mode!=='PERSISTENT')return;
+      if(Array.isArray(saved)){
+        // Combine records captured in RAM while DB was temporarily down with
+        // old saved history, selecting the newer observed outcome by lastChecked.
+        const merged=new Map(saved.map(r=>[r.id,r]));
+        for(const r of this.signalTracker.records){
+          const older=merged.get(r.id);
+          if(!older||(r.lastChecked||0)>=(older.lastChecked||0))merged.set(r.id,r);
+        }
+        this.signalTracker.restore([...merged.values()].sort((a,b)=>b.closedAt-a.closedAt));
+      }
+      console.log(`Signal DB connected: ${this.signalTracker.records.length} history records`);
+      this.scheduleSignalSave();
+    }finally{this.storageBusy=false;}
+  }
+  scheduleSignalSave(){
+    this.dirty=true;
+    if(this.pendingSave)return;
+    this.pendingSave=setTimeout(()=>{this.pendingSave=null;void this.saveSignals();},1200);
+  }
+  async saveSignals(){
+    if(this.saving||!this.dirty)return;
+    if(this.store.mode!=='PERSISTENT')return;
+    this.saving=true;this.dirty=false;
+    const ok=await this.store.save(this.signalTracker.records);
+    if(!ok)this.dirty=true;
+    this.saving=false;
+    if(this.dirty&&ok)this.scheduleSignalSave();
+  }
+  async shutdown(){
+    if(this.pendingSave)clearTimeout(this.pendingSave);
+    if(this.dirty)await this.saveSignals();
+    await this.store.close();
   }
   async init(){
     await this.updateTickers();
@@ -93,7 +139,9 @@ export class Market {
             const result=analyze(t,fifteen,hour);
             // Server captures a BUY only if the live ticker still falls within
             // the anti-chase zone and the candle is recent/fully closed.
-            this.signalTracker.capture(result);
+            const trap=['FALSE_BREAKOUT','WICK_REJECTION'].includes(result.timingPattern?.type);
+            const fomoBlocked=result.confirmed&&classifyFomo({...result,stale:false}).blocked;
+            if(!trap&&!fomoBlocked&&!isExcludedBase(result.symbol))this.signalTracker.capture(result);
             this.analysis.set(t.symbol,result);
           }catch(e){
             console.warn(`Candle ${t.symbol}: ${e.message}`);
@@ -151,13 +199,18 @@ export class Market {
         item.status='WAIT';item.setup='FALSE BREAKOUT · tunggu struktur baharu';
       }
       item.readiness=assessReadiness(item);
+      item.opportunity=assessOpportunity(item);
+      // A stablecoin is never part of the actionable watch/buy signal set.
+      if(isExcludedBase(item.symbol)){
+        item.status='WAIT';item.setup='STABLECOIN EXCLUDED';
+      }
       selected.push(item);
     }
     selected.sort((a,b)=>b.score-a.score||b.volume24-a.volume24);
     // Informational only: readiness does not alter BUY / WATCH / WAIT classification.
     // Exclude BUY (already displayed in priority) and stale/missing OHLC candidates.
     const eligibleReadiness=selected.filter(c=>c.readiness.level!=='NONE'&&c.status!=='BUY'&&
-      !c.breakoutRadar.risk.blocked&&c.smartTiming?.stage!=='FALSE BREAKOUT');
+      !isExcludedBase(c.symbol)&&!c.breakoutRadar.risk.blocked&&c.smartTiming?.stage!=='FALSE BREAKOUT');
     const priorityOrder={'NEAR BUY':0,EARLY:1,MONITOR:2};
     eligibleReadiness.sort((a,b)=>priorityOrder[a.readiness.level]-priorityOrder[b.readiness.level]||
       b.readiness.met-a.readiness.met||b.score-a.score||b.volume24-a.volume24);
@@ -165,18 +218,19 @@ export class Market {
     const earlyMomentum=eligibleReadiness.filter(c=>c.readiness.level==='EARLY').slice(0,8);
     const monitorOnly=eligibleReadiness.filter(c=>c.readiness.level==='MONITOR').slice(0,3);
     // Risk alert cards remain visible separately (not as opportunity signals).
-    const safeRadar=selected.filter(c=>!c.breakoutRadar.risk.blocked&&
+    const safeRadar=selected.filter(c=>!isExcludedBase(c.symbol)&&!c.breakoutRadar.risk.blocked&&
       ['EARLY BREAKOUT','BUILDING'].includes(c.breakoutRadar.stage)&&c.smartTiming?.stage!=='FALSE BREAKOUT');
     safeRadar.sort((a,b)=>b.breakoutRadar.quality-a.breakoutRadar.quality||b.volume24-a.volume24);
     const overextended=selected.filter(c=>c.breakoutRadar.stage==='OVEREXTENDED')
       .sort((a,b)=>b.change24-a.change24);
-    const timingEligible=selected.filter(c=>c.smartTiming&&c.smartTiming.stage!=='NO_DATA');
-    const timingOpportunities=timingEligible.filter(c=>['PULLBACK WATCH','CONFIRMED BREAKOUT','WAIT RETEST','WATCH RESISTANCE'].includes(c.smartTiming.stage)&&
-      c.breakoutRadar?.risk?.blocked!==true).sort((a,b)=>{
-        const aRank={'PULLBACK WATCH':0,'CONFIRMED BREAKOUT':1,'WAIT RETEST':2,'WATCH RESISTANCE':3}[a.smartTiming.stage]??4;
-        const bRank={'PULLBACK WATCH':0,'CONFIRMED BREAKOUT':1,'WAIT RETEST':2,'WATCH RESISTANCE':3}[b.smartTiming.stage]??4;
-        return aRank-bRank||b.score-a.score;
-      });
+    const timingEligible=selected.filter(c=>c.smartTiming&&c.smartTiming.stage!=='NO_DATA'&&!isExcludedBase(c.symbol));
+    // V1.5: watch candidates must also satisfy market quality/liquidity filters.
+    // Filtered items remain visible only in the audit tab, NOT the opportunity list.
+    const timingOpportunities=timingEligible.filter(c=>c.opportunity?.qualified)
+      .sort((a,b)=>b.opportunity.score-a.opportunity.score||b.score-a.score);
+    const timingRejected=timingEligible.filter(c=>!c.opportunity?.qualified &&
+      c.smartTiming.stage!=='FALSE BREAKOUT'&&c.smartTiming.stage!=='OVEREXTENDED')
+      .sort((a,b)=>b.score-a.score||b.volume24-a.volume24);
     const timingWarnings=timingEligible.filter(c=>c.smartTiming.stage==='FALSE BREAKOUT')
       .sort((a,b)=>b.volume24-a.volume24);
     const summary={
@@ -191,13 +245,16 @@ export class Market {
       breakoutCount:safeRadar.filter(c=>c.breakoutRadar.stage==='EARLY BREAKOUT').length,
       buildingCount:safeRadar.filter(c=>c.breakoutRadar.stage==='BUILDING').length,
       overextendedCount:overextended.length,
-      timingCount:timingOpportunities.length,falseBreakoutCount:timingWarnings.length,
+      timingCount:timingOpportunities.length,filteredCount:timingRejected.length,
+      stablecoinExcluded:tickers.filter(t=>isExcludedBase(t.symbol)).length,
+      falseBreakoutCount:timingWarnings.length,
     };
     return {ok:this.lastTicker>0&&!summary.dataStale,summary,coins:selected.slice(0,130),
       nearBuy,earlyMomentum,monitorOnly,
       breakoutCandidates:safeRadar.slice(0,8),overextendedCandidates:overextended.slice(0,8),
-      timingCandidates:timingOpportunities.slice(0,8),timingWarnings:timingWarnings.slice(0,8),
-      signalPerformance:this.signalTracker.snapshot(),
+      timingCandidates:timingOpportunities.slice(0,8),timingRejected:timingRejected.slice(0,8),
+      timingWarnings:timingWarnings.slice(0,8),
+      signalPerformance:{...this.signalTracker.snapshot(),storage:this.store.status()},
       marketTickers:tickers.map(t=>({symbol:t.symbol,price:t.price,change24:t.change24,volume24:t.volume24})),
       error:this.error,config:CFG};
   }

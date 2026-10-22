@@ -1,56 +1,53 @@
-# KuCoin Daily Radar 5–6% — Website V1.4
+# KuCoin Daily Radar 5–6% — Website V1.5
 
-Website responsive PC/Android untuk memantau KuCoin Spot/USDT. **Pemantauan dan paper trading sahaja**. Tiada API key, order automatik, leverage atau janji pulangan.
+Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot order atau jaminan keuntungan 5–6% sehari. Kekalkan URL Render dan repo GitHub `intraday` sedia ada.
 
-## Tambahan V1.4
+## Perubahan V1.5 — Opportunity Quality Filter
 
-### Smart Entry Timing & False Breakout
-- `timing.js` menggunakan candle **15 minit yang sudah lengkap/ditutup** sahaja.
-- **FALSE BREAKOUT**: breakout sebelumnya telah kembali ditutup di bawah paras lama, atau candle semasa menembusi resistance tetapi ditolak dan ditutup di bawah paras (upper wick dominan). Ia menyekat BUY yang mungkin muncul pada snapshot lama dan dikecualikan daripada senarai entry awal.
-- **PULLBACK WATCH**: selepas breakout tertutup dalam lima candle terdahulu, candle semasa menguji kawasan rujukan, kemudian ditutup di atasnya. Ia *bukan BUY*.
-- **CONFIRMED BREAKOUT**: close lebih tinggi daripada 20-candle resistance sebanyak 0.1%, badan candle >=45% julat dan close di 30% atas julat. Label timing ini *bukan* jaminan signal BUY rasmi, yang masih memerlukan semua syarat ketat lain.
-- **WAIT RETEST / WATCH RESISTANCE**: kandidat untuk pemantauan sahaja.
-- **Zon rujukan ATR14**: dari 20-candle resistance hingga resistance + min(0.5 ATR, 0.8% paras resistance). Zon tidak dikeluarkan untuk false breakout/overextended dan **bukan limit order atau harga entry yang dijamin**. Bacaan `LIVE DALAM ZON` bukan arahan membeli.
-- **Risk LOW/MEDIUM/HIGH** ialah label risiko relatif kepada heuristik harga/volume/spread; LOW **tidak bermaksud selamat**.
-- `Technical/Radar Score` dan label risiko ditunjukkan secara berasingan.
+- **Stablecoin/pegged exclusion** (`opportunity.js`): mengecualikan USDC, DAI, USDE, USDT, FDUSD, PYUSD, dan beberapa aset berpatok daripada shortlist *candle analysis* dan semua senarai peluang. Pasangan ini masih boleh wujud dalam jumlah ticker KuCoin keseluruhan.
+- **Qualified Watch** memerlukan semua ini: 15m candle sah/segar, Radar Score ≥45, RVOL ≥1.15x, ADX ≥20, range 24h ≥4%, volume 24h ≥USDT 5 juta, spread ≤0.55%, tiada OVEREXTENDED atau FALSE BREAKOUT dan setup timing yang dikenali. `WATCH RESISTANCE` memerlukan jarak breakout 0–2.5%. Ini **heuristik**, bukan ukuran probabiliti menang.
+- **Ditapis Keluar** ialah senarai audit, berasingan daripada peluang. Sebab gagal ditunjukkan, termasuk volume lemah, ADX rendah, range kecil dan sebagainya. Sekiranya tiada coin lulus, panel Qualified Watch boleh kosong. Tidak dilonggarkan semata-mata untuk muncul signal.
+- Signal BUY rasmi kekal pada syarat ketat V1.4 (EMA/RSI/ADX/RVOL/breakout, dll). Near BUY, Early Breakout, False Breakout, Anti-FOMO, Coin Intelligence, Trading Journal manual dan paparan responsif dikekalkan.
 
-### Signal Performance Tracker
-- `signal-tracker.js` mengesan BUY rasmi **yang sempat dicatat server** semasa scan, selepas close 15 minit, dan menilai pergerakan OHLC 15 minit **selepas** masa signal.
-- `TP+5%` dan `TP+6%` ialah sasaran **harga kasar**, setiap satu dikira berasingan; `SL−2%` ialah paras harga kasar, tempoh pemerhatian maksimum 24 jam.
-- `WIN`, `LOSS`, `AMBIGUOUS` (TP dan SL dalam candle sama), `INCOMPLETE` (candle hilang), `EXPIRED` (24 jam tiada TP/SL), `PENDING` (belum cukup data). Hanya WIN dan LOSS termasuk dalam kadar *hit rate* dipaparkan.
-- Status hasil bukan simulasi pelaksanaan order, tidak termasuk yuran, slippage, bid/ask, taker fill, dan bukan backtest sejarah. Boleh terlepas signal di luar shortlist maksimum 52 coin.
-- **Rekod tracker RAM sahaja**, tidak dipersist; data akan hilang apabila Render restart/spin-down. Jangan gunakan sebagai rekod prestasi jangka panjang. Trading Journal manual tetap tersimpan dalam localStorage browser dan tidak disegerakkan antara peranti.
+## Signal Performance — TP bersih anggaran
 
-### Fungsi V1.0–V1.3 dikekalkan
-- Semua ticker USDT via API awam KuCoin, harga refresh 30s, shortlist candle 15m/1h (sehingga 52 coin/scan) setiap 2 minit semasa proses server aktif.
-- BUY/WATCH/WAIT; EMA20/EMA50/EMA200, RSI, ADX, RVOL, breakout 20 candle.
-- Anti-chase, Anti-FOMO OVEREXTENDED, Near BUY / Early Momentum, Early Breakout.
-- Dashboard PC/mobile, paparan coin lengkap, kalkulator TP bersih selepas fee berdasarkan entry **manual**, Trading Journal dengan export CSV, backup/import JSON.
+- Tracker terus memerhati BUY yang benar-benar diambil semasa scan candle 15m tertutup, **bukan backtest sejarah**. Tiada order dihantar dan tiada rekod fill/broker sebenar.
+- Dua kadar pergerakan **kasar** (+5%/+6%) dikekalkan dan dua penilaian **net anggaran** ditambah. Anggapan mula-mula: 0.10% fee + 0.10% slippage **setiap side** (boleh disunting pada `COST` dalam `signal-tracker.js`).
+- TP bersih +5% memerlukan kira-kira **+5.42%** pergerakan harga kasar; TP bersih +6% kira-kira **+6.42%**. SL harga kasar −2% menyebabkan kira-kira −2.39% bersih selepas kos (mengikut model kos ini). Ini hanyalah anggaran; spread, liquidity, order fill, fee sebenar dan turun naik slippage tidak dimodelkan.
+- TP dan SL dalam candle sama dianggap `AMBIGUOUS` dan dikecualikan daripada kadar hit. Kegagalan sambungan candle dianggap `INCOMPLETE`, bukan kemenangan. `EXPIRED` selepas 24h tanpa sentuh TP/SL menggunakan bar lengkap; hanya `WIN`/`LOSS` untuk kadar hit dipaparkan. Histori terhad kepada 2000 signal terbaharu (anti-duplicate by candle).
 
-## Deployment GitHub + Render (service yang sama)
-1. **Backup dahulu** Trading Journal di website lama: buka Trading Journal → Backup JSON.
-2. Extract ZIP dan upload **isi** folder ke root repository `fadhliroslan89/intraday` pada branch `main`, termasuk `public/`, `test/`, `timing.js`, `signal-tracker.js`, `server.js`, `analytics.js`, `market.js`, `package.json`, `README.md`.
-3. Jika GitHub minta, overwrite fail yang sama nama; pastikan folder `public/` kekal di root dan `package.json` tidak berada dalam subfolder tambahan.
-4. Commit changes. Jika Render Auto Deploy hidup, tunggu status **Live** untuk commit baharu; jika tidak, pilih Manual Deploy → Deploy latest commit.
-5. Semak https://intraday-t1ln.onrender.com dan label V1.4. Hard refresh jika browser simpan cache.
-6. Semak bahagian Smart Entry Timing dan Signal Performance. Tracker kosong pada awalnya adalah normal kerana tidak ada signal BUY dicatat sejak server mula.
+## Simpanan sejarah signal: pilihan PostgreSQL
 
-Render Free tidak menyediakan proses 24/7 kerana instance boleh tidur/restart. Sekiranya sambungan KuCoin gagal, dashboard menandakan data offline dan tidak menjana signal daripada data rekaan.
+**PENTING: tanpa DATABASE_URL, `Signal Performance` kekal MEMORY ONLY dan akan hilang jika Render Free tidur/restart.** Render Free mempunyai filesystem sementara; SQLite/local JSON **tidak** menyelesaikan masalah ini. Fungsi persistent direka dan diuji dengan fake database, tetapi sambungan PostgreSQL sebenar belum dapat diuji dalam persekitaran ini.
 
-## Fail penting
-- `server.js` — HTTP server (Node 20+).
-- `market.js` — akses KuCoin, cache, candidate selection, snapshot, tracker.
-- `analytics.js` — analisis EMA/RSI/ADX, BUY/WATCH, Anti-FOMO, Near BUY.
-- `timing.js` — klasifikasi setup candle & Smart Entry Timing.
-- `signal-tracker.js` — outcome signal berbasis candle tertutup dan hasil yang tidak pasti.
-- `public/index.html`, `public/app.js`, `public/styles.css`, `public/trade-math.js` — website, journal & kalkulator.
-- `test/*.test.js` — ujian unit/integrasi.
+Untuk simpan rekod secara kekal merentas restart:
 
-## Jalankan / uji secara lokal
+1. Bina pangkalan data **Neon PostgreSQL** di https://console.neon.tech/ (atau servis PostgreSQL luaran yang menyokong TLS). Pastikan terma, kuota dan status langganan mengikut akaun anda.
+2. Dalam Neon Console pilih project → **Connect**, salin Postgres connection string `postgresql://...?...sslmode=require`. **JANGAN** tampal rahsia ini ke chat atau GitHub.
+3. Buka Render Dashboard → pilih Web Service `intraday` → **Environment** → **Add Environment Variable**:
+   - KEY: `DATABASE_URL`
+   - VALUE: connection string PostgreSQL sebenar daripada Neon
+4. Simpan perubahan; Render akan deploy/restart service jika dikonfigurasi begitu. Database table `radar_signal_state` dibuat oleh server apabila sambungan berjaya.
+5. Buka website → **Signal performance tracker**. Status **PERSISTENT · DATABASE CONNECTED** bermakna sambungan aktif; status **MEMORY ONLY** bermakna rekod belum tersimpan kekal.
+6. Jika masalah, semak Render Logs. Jangan kongsi connection string. Simpan backup pada penyedia database kerana tiada jaminan kekal selama-lamanya jika projek/plan DB tamat atau dipadam.
+
+Tracker menggunakan satu JSONB row dalam PostgreSQL; akses database hanya dari Node server. Ini untuk deployment **single-instance** seperti Render Free, bukan sistem trading berbilang worker serentak. Data tidak diselaraskan dengan jurnal paper trade tempatan (browser localStorage). Sejarah **sebelum V1.5** yang hilang semasa restart tidak boleh dipulihkan secara automatik.
+
+## Update GitHub + Render
+
+1. Eksport **Trading Journal → Backup JSON** pada website lama terlebih dahulu.
+2. Extract ZIP V1.5. Upload **SEMUA ISI** folder ke root repo `https://github.com/fadhliroslan89/intraday`, branch `main`. Jangan upload ZIP sebagai satu fail atau buat folder `v1.5` yang menyebabkan `package.json` tiada di root.
+3. Fail baharu: `opportunity.js`, `signal-store.js`. Fail kemas kini: `server.js`, `market.js`, `analytics.js`, `signal-tracker.js`, `package.json`, `public/` dan `test/`.
+4. Commit changes. Render auto-deploy jika diaktifkan, atau Manual Deploy → Deploy latest commit.
+5. Semak website `https://intraday-t1ln.onrender.com` dan label **V1.5**. Tab baharu: **Qualified Watch** dan **Ditapis Keluar**.
+6. **Pilihan:** sambungkan PostgreSQL seperti arahan di atas untuk status PERSISTENT. Website tanpa DB masih berfungsi, tetapi rekod auto-signal tetap sementara.
+
+Jika mahu uji secara lokal (Node.js 20+):
+
 ```sh
+npm install
 npm test
 npm start
 ```
-Buka http://localhost:3000. Untuk Render: runtime Node, build `npm install`, start `npm start`, region Singapore, root directory kosong jika file di root.
 
-**Peringatan:** Sasaran 5–6% ialah sasaran dagangan, bukan pulangan yang dijamin. Gunakan paper trade terlebih dahulu; modal sebenar mempunyai risiko kehilangan.
+Tanpa database, log mungkin memberitahu scanner gagal hubungi KuCoin jika akses API di rangkaian tempatan disekat. Dalam keadaan itu website tidak patut menganggap harga/signal offline sebagai live.
