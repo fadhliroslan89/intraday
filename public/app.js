@@ -1,0 +1,225 @@
+const $=id=>document.getElementById(id);
+const q=(s,root=document)=>root.querySelector(s);
+const qa=(s,root=document)=>[...root.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeNum=v=>Number.isFinite(Number(v))?Number(v):0;
+const dollars=v=>Number(v).toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});
+const compact=v=>{const n=safeNum(v);return n>=1e9?'$'+(n/1e9).toFixed(2)+'B':n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1000?'$'+(n/1000).toFixed(0)+'K':'$'+n.toFixed(0)};
+const price=v=>{const n=safeNum(v);return n>=1000?n.toLocaleString('en-US',{maximumFractionDigits:2}):n>=1?n.toLocaleString('en-US',{maximumFractionDigits:4}):n>=0.01?n.toFixed(5):n>0?n.toPrecision(5):'—'};
+const pc=(v,plus=true)=>(plus&&safeNum(v)>0?'+':'')+safeNum(v).toFixed(2)+'%';
+const color=v=>safeNum(v)>=0?'positive':'negative';
+const time=v=>v?new Date(v).toLocaleString('ms-MY',{timeZone:'Asia/Kuala_Lumpur',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
+const stamp=()=>new Date().toISOString();
+const STORE='dailyRadarPrefsV1',JOURNAL='dailyRadarJournalV1';
+function load(key,fallback){try{const v=JSON.parse(localStorage.getItem(key));return v??fallback;}catch{return fallback;}}
+function persist(key,v){try{localStorage.setItem(key,JSON.stringify(v));return true;}catch{toast('Browser tidak benarkan simpan rekod tempatan.');return false;}}
+const stored=load(STORE,{});
+const prefs={score:'60',volume:'5000000',range:'5',status:'ALL',sort:'score',favorites:[],...stored};
+let trades=load(JOURNAL,[]);
+if(!Array.isArray(trades))trades=[];
+trades=trades.filter(x=>x&&typeof x.symbol==='string'&&/^[A-Z0-9]+-USDT$/.test(x.symbol));
+let latest=null,lastDataAt=0,busy=false,seenSignals=new Set(),hasBaseline=false,selectedCoin=null,toastTimer=0;
+const filters={score:$('filterScore'),volume:$('filterVolume'),range:$('filterRange'),sort:$('sortBy')};
+for(const [k,el] of Object.entries(filters))if([...el.options].some(x=>x.value===String(prefs[k])))el.value=String(prefs[k]);
+const safeSymbol=s=>/^[A-Z0-9]+-USDT$/.test(s||'')?s:'';
+const ticker=s=>latest?.marketTickers?.find(t=>t.symbol===s);
+const coin=s=>latest?.coins?.find(t=>t.symbol===s);
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),3100);}
+function show(view){qa('.view').forEach(x=>x.classList.toggle('hidden',x.id!==`view-${view}`));qa('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='journal')renderJournal();}
+qa('.nav-tab').forEach(b=>b.addEventListener('click',()=>show(b.dataset.view)));
+function graph(values,width=360,height=135){
+  if(!Array.isArray(values)||values.length<2)return `<div class="muted" style="text-align:center;padding-top:45px">Carta candle belum tersedia</div>`;
+  const vals=values.map(safeNum),lo=Math.min(...vals),hi=Math.max(...vals),spread=hi-lo||hi*.01||1;
+  const points=vals.map((v,i)=>`${(i/(vals.length-1)*width).toFixed(1)},${(height-8-(v-lo)/spread*(height-22)).toFixed(1)}`);
+  const upward=vals.at(-1)>=vals[0];const stroke=upward?'#54e8b5':'#f48693';
+  const id='fill'+Math.abs(Math.trunc(vals[0]*1e6));
+  const poly=points.join(' '),last=points.at(-1).split(',');
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Trend 35 candle 15 minit" preserveAspectRatio="none"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${stroke}" stop-opacity=".25"/><stop offset="1" stop-color="${stroke}" stop-opacity=".01"/></linearGradient></defs><polygon points="0,${height} ${poly} ${width},${height}" fill="url(#${id})"/><polyline points="${poly}" fill="none" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="4" fill="${stroke}"/></svg>`;
+}
+const badge=c=>`<span class="status-tag tag-${c==='BUY'?'BUY':c==='WATCH'?'WATCH':'WAIT'}">${c==='BUY'?'● ':c==='WATCH'?'◉ ':'○ '}${esc(c)}</span>`;
+const isFav=s=>prefs.favorites.includes(s);
+function filterCoins(){
+  if(!latest)return [];
+  const s=$('searchInput').value.trim().toUpperCase();
+  const result=latest.coins.filter(c=>{
+    if(prefs.status==='STAR'&&!isFav(c.symbol))return false;
+    if(prefs.status==='BUY'&&c.status!=='BUY')return false;
+    if(prefs.status==='WATCH'&&c.status!=='WATCH')return false;
+    if(s&&!c.symbol.includes(s))return false;
+    if(c.score<Number(filters.score.value))return false;
+    if(c.volume24<Number(filters.volume.value)||c.range24<Number(filters.range.value))return false;
+    return true;
+  });
+  const sort=filters.sort.value;
+  return result.sort((a,b)=>(safeNum(b[sort])-safeNum(a[sort]))||b.score-a.score);
+}
+function renderCoinRow(c){
+  return `<tr><td><div class="symbol-cell"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}" aria-label="Favorite ${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="coin-name">${esc(c.symbol.split('-')[0])}</div><div class="coin-pair">/ USDT</div></div></div></td><td><strong>$${price(c.price)}</strong></td><td class="${color(c.change24)}">${pc(c.change24)}</td><td>${compact(c.volume24)}</td><td>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</td><td>${c.rsi?safeNum(c.rsi).toFixed(1):'—'}</td><td><div class="score-cell"><b>${c.score||0}</b><span class="score-bar"><i style="width:${c.score||0}%"></i></span></div></td><td>${badge(c.status)}</td><td><button class="row-action" data-open="${esc(c.symbol)}" aria-label="Butiran ${esc(c.symbol)}">↗</button></td></tr>`;
+}
+function renderMobileRow(c){return `<div class="mobile-coin"><div class="mobile-row mobile-top"><div class="mobile-label"><button class="coin-star ${isFav(c.symbol)?'saved':''}" data-star="${esc(c.symbol)}">${isFav(c.symbol)?'★':'☆'}</button><span class="coin-icon">${esc(c.symbol.split('-')[0].slice(0,2))}</span><div><div class="mobile-symbol">${esc(c.symbol)}</div><div class="mobile-price">$${price(c.price)}</div></div></div>${badge(c.status)}</div><div class="mobile-info"><div><small>24H MOVE</small><b class="${color(c.change24)}">${pc(c.change24)}</b></div><div><small>VOLUME</small><b>${compact(c.volume24)}</b></div><div><small>RVOL</small><b>${c.rvol?safeNum(c.rvol).toFixed(2)+'x':'—'}</b></div><div><small>SCORE</small><b class="up">${c.score||0}/100</b></div></div><div class="mobile-row mobile-bottom"><span class="muted">Range ${pc(c.range24,false)} · RSI ${c.rsi||'—'}</span><button class="small-btn" data-open="${esc(c.symbol)}">Lihat Setup →</button></div></div>`;}
+function render(){
+  if(!latest)return;
+  const s=latest.summary;
+  $('kpiPairs').textContent=s.totalPairs||'—';$('kpiAnalyzed').textContent=s.analyzed||0;
+  $('kpiBuy').textContent=s.buy||0;$('kpiWatch').textContent=s.watch||0;
+  $('updatedAt').textContent=s.updated?'Data harga: '+time(s.updated)+' MYT':'Menunggu data...';
+  $('coverageInfo').textContent=`· ${s.coverage||0} calon/pusingan`;const current=filterCoins();
+  $('resultCount').textContent=current.length;
+  $('coinsTable').innerHTML=current.length?current.map(renderCoinRow).join(''):'<tr><td colspan="9" class="table-loading">Tiada coin padan tapisan</td></tr>';
+  $('coinMobileList').innerHTML=current.map(renderMobileRow).join('');
+  $('emptyState').classList.toggle('hidden',current.length>0);
+  const top=[...latest.coins].filter(c=>['BUY','WATCH'].includes(c.status)&&c.confirmed&&c.volume24>=1_000_000)
+    .sort((a,b)=>(a.status==='BUY'?-1:0)-(b.status==='BUY'?-1:0)||b.score-a.score).slice(0,3);
+  $('topPicks').innerHTML=top.length?top.map((c,i)=>`<button type="button" class="pick-card" data-open="${esc(c.symbol)}"><div class="pick-head"><span class="pick-rank">#0${i+1} · PRIORITY</span>${badge(c.status)}</div><div class="pick-symbol">${esc(c.symbol.split('-')[0])}<span class="muted"> / USDT</span></div><div class="pick-sub">$${price(c.price)}</div><div class="pick-stats"><div><small>24H CHANGE</small><strong class="${color(c.change24)}">${pc(c.change24)}</strong></div><div><small>REL. VOL</small><strong>${c.rvol||0}x</strong></div><div><small>RADAR SCORE</small><strong class="up">${c.score}/100</strong></div></div><div class="pick-footer"><span>${esc(c.setup||'Semak setup')}</span><span class="score-bubble">ANALYZE ↗</span></div></button>`).join(''):
+    `<div class="pick-placeholder">${s.candleScanRunning?'Scan candle sedang berjalan...':'Belum ada setup teknikal mencukupi. Semak senarai di bawah.'}</div>`;
+  const isOnline=latest.ok&&!s.dataStale;
+  $('connectionPill').classList.toggle('offline',!isOnline);
+  $('connectionLabel').textContent=isOnline?'LIVE DATA':'DATA OFFLINE';
+  $('globalError').textContent=latest.error||(!isOnline?'Data lama/tidak tersedia. Jangan gunakan signal sehingga sambungan pulih.':'');
+  $('globalError').classList.toggle('hidden',!$('globalError').textContent);
+  $('journalBadge').textContent=trades.filter(t=>t.status==='OPEN').length;
+  if(!q('#view-journal.hidden'))renderJournal();
+}
+function openDrawer(sym){
+  const c=coin(sym);if(!c)return;
+  selectedCoin=sym;
+  $('drawerSymbol').textContent=sym;
+  const points=c.spark||[];
+  const reasons=(c.reasons||[]).slice(0,7).map(x=>`<p>• ${esc(x)}</p>`).join('')||'<p>Tiada halangan utama direkodkan.</p>';
+  $('drawerBody').innerHTML=`
+    <div class="detail-price">$${price(c.price)}</div><div class="${color(c.change24)}" style="font-weight:850">${pc(c.change24)} · 24H</div>
+    <div class="detail-graph">${graph(points)}</div><div class="mobile-row">${badge(c.status)}<span class="muted">Signal candle: ${c.lastCandle?time(c.lastCandle+900000):'—'}</span></div>
+    <div class="detail-grid">
+      <div class="detail-item"><small>RADAR SCORE</small><strong class="up">${c.score||0}/100</strong></div><div class="detail-item"><small>VOLUME 24H</small><strong>${compact(c.volume24)}</strong></div>
+      <div class="detail-item"><small>RELATIVE VOLUME</small><strong>${c.rvol||'—'}x</strong></div><div class="detail-item"><small>RSI / ADX</small><strong>${c.rsi||'—'} / ${c.adx||'—'}</strong></div>
+      <div class="detail-item"><small>24H RANGE</small><strong>${pc(c.range24,false)}</strong></div><div class="detail-item"><small>SPREAD</small><strong>${pc(c.spread,false)}</strong></div>
+      <div class="detail-item"><small>TP1 (+5%) *</small><strong class="up">$${c.entry?price(c.tp1):'—'}</strong></div><div class="detail-item"><small>TP2 (+6%) *</small><strong class="up">$${c.entry?price(c.tp2):'—'}</strong></div>
+      <div class="detail-item"><small>ENTRY REFERENCE *</small><strong>${c.entry?'$'+price(c.entry):'—'}</strong></div><div class="detail-item"><small>STOP (−2%) *</small><strong class="down">$${c.entry?price(c.sl):'—'}</strong></div>
+    </div><div class="form-hint">* Paras dihitung daripada harga close candle 15m terakhir, BUKAN harga entry sebenar anda. Sila sesuaikan mengikut fills, fee & spread.</div>
+    <div class="detail-reasons"><h3>${esc(c.setup||'Analisis')}</h3>${reasons}</div>
+    <div class="detail-actions"><a href="https://www.kucoin.com/trade/${encodeURIComponent(sym)}" target="_blank" rel="noopener noreferrer">Open KuCoin ↗</a><a href="https://www.tradingview.com/chart/?symbol=KUCOIN%3A${encodeURIComponent(sym.replace('-',''))}" target="_blank" rel="noopener noreferrer">TradingView ↗</a></div>
+    <form id="paperForm" class="form-card"><h3>+ Rekod Paper Trade</h3><p>Entry manual sahaja — tiada order dihantar ke exchange.</p><div class="form-fields"><label>Entry Price (USDT)<input id="journalEntry" type="number" step="any" min="0.000000001" required value="${safeNum(c.price)}"></label><label>Position Size (USDT)<input id="journalSize" type="number" min="1" step="any" required value="100"></label><label>Fee setiap side (%)<input id="journalFee" type="number" min="0" max="5" step="0.01" required value="0.1"></label><label>Note (optional)<input id="journalNote" type="text" maxlength="120" placeholder="Setup / sebab masuk"></label></div><button class="primary-btn" type="submit">+ Tambah ke Journal</button><div class="form-hint">P/L akan dikira dalam USDT berdasarkan size, fee anggaran dan exit manual.</div></form>`;
+  $('overlay').classList.remove('hidden');$('coinDrawer').classList.remove('hidden');$('coinDrawer').scrollTop=0;document.body.style.overflow='hidden';
+  q('#paperForm').addEventListener('submit',e=>{e.preventDefault();
+    const entry=Number($('journalEntry').value),size=Number($('journalSize').value),fee=Number($('journalFee').value),note=$('journalNote').value.trim();
+    if(!entry||entry<=0||size<=0||fee<0||fee>5)return toast('Semak nilai entry, size dan fee.');
+    trades.unshift({id:globalThis.crypto?.randomUUID?.()||String(Date.now()),symbol:sym,status:'OPEN',entry,size,fee,note,opened:stamp(),exit:null,closed:null});
+    if(persist(JOURNAL,trades)){toast(`Paper trade ${sym} direkodkan.`);closeDrawer();show('journal');}
+  });
+}
+function closeDrawer(){selectedCoin=null;closeAll();}
+function closeAll(){$('overlay').classList.add('hidden');$('coinDrawer').classList.add('hidden');$('settingsDrawer').classList.add('hidden');document.body.style.overflow='';}
+$('closeDrawer').addEventListener('click',closeDrawer);$('closeSettings').addEventListener('click',closeAll);$('overlay').addEventListener('click',closeAll);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll();});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-open],[data-star]');if(!b)return;
+  if(b.dataset.open)openDrawer(b.dataset.open);
+  if(b.dataset.star){const sym=b.dataset.star;
+    if(!safeSymbol(sym))return;
+    prefs.favorites=isFav(sym)?prefs.favorites.filter(x=>x!==sym):[...prefs.favorites,sym];persist(STORE,prefs);render();}
+});
+qa('.filter-chip').forEach(b=>b.addEventListener('click',()=>{prefs.status=b.dataset.status;qa('.filter-chip').forEach(x=>x.classList.toggle('selected',x.dataset.status===prefs.status));persist(STORE,prefs);render();}));
+qa('.filter-chip').forEach(x=>x.classList.toggle('selected',x.dataset.status===prefs.status));
+for(const [key,el] of Object.entries(filters))el.addEventListener('change',()=>{prefs[key]=el.value;persist(STORE,prefs);render();});
+$('searchInput').addEventListener('input',render);
+$('refreshBtn').addEventListener('click',()=>{loadDashboard(true);toast('Memuat semula data pelayan...');});
+$('settingsBtn').addEventListener('click',()=>{
+  $('settingsScore').value=filters.score.value;
+  $('settingsScoreValue').textContent=filters.score.value+'+';
+  $('settingsVolume').value=filters.volume.value;
+  $('overlay').classList.remove('hidden');$('settingsDrawer').classList.remove('hidden');document.body.style.overflow='hidden';
+});
+$('settingsScore').addEventListener('input',()=>{$('settingsScoreValue').textContent=$('settingsScore').value+'+';});
+$('saveSettings').addEventListener('click',()=>{
+  // Nearest supported select threshold
+  filters.score.value=$('settingsScore').value;filters.volume.value=$('settingsVolume').value;
+  prefs.score=filters.score.value;prefs.volume=filters.volume.value;persist(STORE,prefs);render();closeAll();toast('Tapisan disimpan.');
+});
+function pnl(t,exit){if(!(exit>0))return null;return (t.size||0)*((exit/t.entry)*(1-(t.fee||0)/100)-(1+(t.fee||0)/100));}
+function tradePnl(t){const exit=t.status==='CLOSED'?t.exit:ticker(t.symbol)?.price;return pnl(t,exit);}
+function renderJournal(){
+  const closed=trades.filter(t=>t.status==='CLOSED'),win=closed.filter(t=>tradePnl(t)>0).length;
+  const realized=closed.reduce((s,t)=>s+(tradePnl(t)||0),0);
+  $('journalTotal').textContent=trades.length;$('journalOpen').textContent=trades.filter(t=>t.status==='OPEN').length;
+  $('journalWin').textContent=closed.length?((win/closed.length)*100).toFixed(1)+'%':'—';
+  $('journalPnl').textContent=(realized>0?'+':'')+dollars(realized);
+  $('journalPnl').className='kpi-value '+(realized>=0?'up':'down');
+  $('journalRows').innerHTML=trades.length?trades.map(t=>{
+    const current=t.status==='OPEN'?ticker(t.symbol)?.price:t.exit;
+    const profit=tradePnl(t);const roi=profit===null?null:(profit/(t.size*(1+t.fee/100)))*100;
+    return `<div class="journal-row"><div><strong>${esc(t.symbol)}</strong><small>${esc(time(t.opened))} · ${t.status==='OPEN'?badge('WATCH'):'CLOSED'}</small></div><div><strong>Entry $${price(t.entry)}</strong><small>Size ${dollars(t.size)} · Fee ${t.fee}%/side</small></div><div><strong>${t.status==='OPEN'?'Mark':'Exit'} ${current?'$'+price(current):'—'}</strong><small>${esc(t.note||'Tiada note')}</small></div><div><div class="pnl-value ${profit===null?'muted':profit>=0?'up':'down'}">${profit===null?'—':(profit>0?'+':'')+dollars(profit)}</div><small>${roi===null?'Harga tak tersedia':pc(roi)}</small></div><div>${t.status==='OPEN'?`<button class="small-btn" data-trade-close="${esc(t.id)}">Close Trade</button>`:`<button class="danger-btn" data-trade-delete="${esc(t.id)}">Delete</button>`}</div></div>`;
+  }).join(''):'<div class="journal-empty"><strong>Belum ada trade direkodkan.</strong>Buka Radar → pilih mana-mana coin → “Tambah ke Journal”.</div>';
+}
+$('journalRows').addEventListener('click',e=>{
+  const close=e.target.closest('[data-trade-close]');const del=e.target.closest('[data-trade-delete]');
+  if(close){const t=trades.find(x=>x.id===close.dataset.tradeClose);if(!t)return;
+    const guess=ticker(t.symbol)?.price||t.entry;
+    const value=window.prompt(`Exit price sebenar (USDT) untuk ${t.symbol}:`,String(guess));
+    if(value===null)return;const n=Number(value);
+    if(!Number.isFinite(n)||n<=0)return toast('Masukkan exit price yang sah.');
+    t.exit=n;t.status='CLOSED';t.closed=stamp();persist(JOURNAL,trades);renderJournal();render();toast('Trade ditutup dalam jurnal.');
+  }
+  if(del){if(!window.confirm('Padam rekod trade ini?'))return;trades=trades.filter(x=>x.id!==del.dataset.tradeDelete);persist(JOURNAL,trades);renderJournal();render();}
+});
+function download(text,filename,mime){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);}
+$('exportJson').addEventListener('click',()=>{download(JSON.stringify({version:1,exported:stamp(),trades},null,2),'daily-radar-journal.json','application/json');toast('Backup JSON dimuat turun.');});
+$('exportCsv').addEventListener('click',()=>{
+  const rows=[['Symbol','Status','Opened','Closed','Entry','Exit','Size_USDT','Fee_percent_per_side','PnL_USDT','ROI_percent','Note'],...trades.map(t=>{
+    const r=tradePnl(t),roi=r===null?'':r/(t.size*(1+t.fee/100))*100;
+    return [t.symbol,t.status,t.opened,t.closed||'',t.entry,t.exit||'',t.size,t.fee,r??'',roi,t.note||''];
+  })];
+  const csv=rows.map(r=>r.map(v=>{const value=String(v??'');const safe=/^[=+@\-\t\r]/.test(value)&&!/^-[0-9.]+$/.test(value)?"'"+value:value;return '"'+safe.replaceAll('"','""')+'"';}).join(',')).join('\r\n');
+  download('\ufeff'+csv,'daily-radar-journal.csv','text/csv;charset=utf-8');toast('CSV dimuat turun.');
+});
+$('importFile').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    if(f.size>3_000_000)throw Error('File terlalu besar');
+    const parsed=JSON.parse(await f.text());
+    if(parsed.version!==1||!Array.isArray(parsed.trades))throw Error('Format backup tidak sesuai');
+    const incoming=parsed.trades.filter(t=>t&&safeSymbol(t.symbol)&&['OPEN','CLOSED'].includes(t.status)&&
+      Number(t.entry)>0&&Number(t.size)>0&&Number(t.fee)>=0&&Number(t.fee)<=5&&
+      (t.status==='OPEN'||Number(t.exit)>0)).slice(0,1000).map(t=>({
+        id:String(t.id||'')||globalThis.crypto?.randomUUID?.()||String(Date.now()),symbol:t.symbol,status:t.status,
+        entry:Number(t.entry),size:Number(t.size),fee:Number(t.fee),
+        opened:String(t.opened||stamp()).slice(0,50),closed:t.closed?String(t.closed).slice(0,50):null,
+        exit:t.status==='CLOSED'?Number(t.exit):null,note:String(t.note||'').slice(0,120)
+      }));
+    if(!incoming.length)throw Error('Tiada trade sah dalam backup');
+    if(!window.confirm(`Import ${incoming.length} trade? Trade dengan ID sama akan digantikan; yang lain dikekalkan.`))return;
+    const map=new Map(trades.map(t=>[t.id,t]));for(const t of incoming)map.set(t.id,t);
+    trades=[...map.values()].slice(0,1500);persist(JOURNAL,trades);renderJournal();toast(`${incoming.length} trade berjaya diimport.`);
+  }catch(err){toast(`Import gagal: ${err.message}`);}finally{e.target.value='';}
+});
+$('alertsBtn').addEventListener('click',async()=>{
+  if(!('Notification' in window))return toast('Browser ini tidak menyokong notification API.');
+  const status=await Notification.requestPermission();
+  toast(status==='granted'?'Alert browser diaktifkan (semasa tab terbuka).':'Kebenaran notifikasi tidak diberikan.');
+});
+function alertNewBuys(data){
+  const buy=data.coins.filter(c=>c.status==='BUY'&&c.lastCandle).map(c=>`${c.symbol}:${c.lastCandle}`);
+  if(!hasBaseline){seenSignals=new Set(buy);hasBaseline=true;return;}
+  for(const key of buy){
+    if(!seenSignals.has(key)&&document.visibilityState==='visible'&&window.Notification?.permission==='granted'){
+      try{new Notification('Daily Radar · BUY setup',{body:`${key.split(':')[0]}: candle 15m confirmed, semak carta sebelum entry.`,tag:key});}catch{}
+    }
+    seenSignals.add(key);
+  }
+  if(seenSignals.size>2000)seenSignals=new Set(buy);
+}
+async function loadDashboard(force=false){
+  if(busy)return;
+  busy=true;
+  try{
+    const res=await fetch('/api/dashboard'+(force?'?t='+Date.now():''),{cache:'no-store'});
+    if(!res.ok)throw Error(`Server HTTP ${res.status}`);
+    const data=await res.json();
+    latest=data;lastDataAt=Date.now();render();alertNewBuys(data);
+    // Keep any draft entry fields intact while automatic refresh runs.
+  }catch(err){
+    $('connectionPill').classList.add('offline');$('connectionLabel').textContent='DISCONNECTED';
+    $('globalError').textContent='Tidak dapat baca server: '+err.message+' — semak sambungan internet atau Render sedang bangun dari sleep.';
+    $('globalError').classList.remove('hidden');
+  }finally{busy=false;}
+}
+loadDashboard();setInterval(()=>loadDashboard(),20_000);

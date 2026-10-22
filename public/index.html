@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b111d" />
+  <meta name="description" content="KuCoin Spot Daily Radar: pantau momentum, breakout, liquidity dan trend 15m/1h untuk mencari peluang 5–6% secara berdisiplin." />
+  <title>Daily Radar 5–6% | KuCoin</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#radar" aria-label="Daily Radar home">
+        <span class="brand-mark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m2 16 5-5 4 3 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 5h4v4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="brand-text">DAILY<span>RADAR</span><small>KUCOIN SPOT • USDT</small></span>
+      </a>
+      <nav class="nav-tabs" aria-label="Navigasi utama">
+        <button type="button" class="nav-tab active" data-view="radar">Radar</button>
+        <button type="button" class="nav-tab" data-view="journal">Trading Journal <span id="journalBadge" class="nav-count">0</span></button>
+        <button type="button" class="nav-tab" data-view="guide">Panduan</button>
+      </nav>
+      <div class="top-actions">
+        <span class="connection-pill" id="connectionPill"><i class="pulse-dot"></i><span id="connectionLabel">Menyambung</span></span>
+        <button class="icon-button" type="button" id="alertsBtn" title="Aktifkan notifikasi browser" aria-label="Notifikasi">♧</button>
+        <button class="icon-button" type="button" id="settingsBtn" title="Tetapan paparan" aria-label="Tetapan">⚙</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div id="globalError" class="error-banner hidden" role="status"></div>
+
+    <section class="view" id="view-radar">
+      <div class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-icon">✦</span> INTRADAY OPPORTUNITY ENGINE <span class="version">V1.0</span></div>
+          <h1>Hunt the <em>5–6%</em><br/>daily move.</h1>
+          <p>Lebih selektif. Kurang kejar candle. Pantau momentum, volum & breakout pada trend 15m dan 1h — untuk <strong>setup spot long sahaja.</strong></p>
+          <div class="hero-subline"><span>◷ Auto refresh 30s</span><span>◇ Candle sah 15m</span><span>↗ Take Profit +5% / +6%</span></div>
+        </div>
+        <div class="target-panel" aria-label="Parameter risiko">
+          <div class="target-panel-top"><span>TRADE PLAYBOOK</span><span class="target-state">SPOT · NO LEVERAGE</span></div>
+          <div class="target-heading">Daily target <span>5–6<span class="percent-sign">%</span></span></div>
+          <div class="meter"><span class="meter-segment one"></span><span class="meter-segment two"></span><span class="meter-segment three"></span><span class="meter-segment four"></span><span class="meter-segment five"></span></div>
+          <div class="target-values"><div><small>TAKE PROFIT 1</small><strong class="up">+5.0%</strong></div><div><small>TAKE PROFIT 2</small><strong class="up">+6.0%</strong></div><div><small>REFERENCE SL</small><strong class="down">−2.0%</strong></div></div>
+          <p>Target posisi, bukan pulangan dijamin setiap hari.</p>
+        </div>
+      </div>
+
+      <section class="kpi-grid" aria-label="Ringkasan pasaran">
+        <div class="kpi-card"><div class="kpi-label">PASANGAN DIPANTAU <span>◉</span></div><div class="kpi-value" id="kpiPairs">—</div><div class="kpi-foot">Semua ticker USDT aktif</div></div>
+        <div class="kpi-card"><div class="kpi-label">ANALISIS TEKNIKAL <span>▥</span></div><div class="kpi-value" id="kpiAnalyzed">—</div><div class="kpi-foot">Candle 15m + 1h tersedia</div></div>
+        <div class="kpi-card accent-green"><div class="kpi-label">BUY SETUPS <span>↗</span></div><div class="kpi-value" id="kpiBuy">—</div><div class="kpi-foot">Lulus semua syarat BUY</div></div>
+        <div class="kpi-card accent-blue"><div class="kpi-label">WATCHLIST <span>◎</span></div><div class="kpi-value" id="kpiWatch">—</div><div class="kpi-foot">Setup berpotensi, belum sah</div></div>
+      </section>
+
+      <section class="top-section">
+        <div class="section-head"><div><div class="eyebrow eyebrow-small">PRIORITY WATCH</div><h2>Top opportunity <span>radar</span></h2></div><span class="section-sidenote" id="updatedAt">Menunggu data KuCoin...</span></div>
+        <div class="picks-grid" id="topPicks"><div class="pick-placeholder">Menghubungkan data pasaran KuCoin...</div></div>
+      </section>
+
+      <section class="screener-section" id="screener">
+        <div class="section-head screener-title"><div><div class="eyebrow eyebrow-small">FULL MARKET SCREEN</div><h2>Live <span>screener</span></h2></div><span class="data-note">Score bukan kebarangkalian menang</span></div>
+        <div class="filter-panel">
+          <div class="filter-top-row">
+            <label class="search-wrap"><span>⌕</span><input id="searchInput" type="search" placeholder="Cari coin... contoh SOL, ETH" autocomplete="off" /></label>
+            <div class="filter-status" role="group" aria-label="Tapisan status"><button data-status="ALL" class="filter-chip selected">Semua</button><button data-status="BUY" class="filter-chip">BUY</button><button data-status="WATCH" class="filter-chip">WATCH</button><button data-status="STAR" class="filter-chip">★ Favorites</button></div>
+          </div>
+          <div class="filter-bottom-row">
+            <label>Min. Score<select id="filterScore"><option value="0">Semua skor</option><option value="50">50+</option><option value="60" selected>60+</option><option value="70">70+</option><option value="80">80+</option></select></label>
+            <label>Volum 24h<select id="filterVolume"><option value="0">Semua</option><option value="1000000">$1M+</option><option value="5000000" selected>$5M+</option><option value="10000000">$10M+</option><option value="25000000">$25M+</option></select></label>
+            <label>Min. Range 24h<select id="filterRange"><option value="0">Semua</option><option value="3">3%+</option><option value="5" selected>5%+</option><option value="8">8%+</option><option value="10">10%+</option></select></label>
+            <label>Susunan<select id="sortBy"><option value="score">Score tertinggi</option><option value="change24">24h gain</option><option value="volume24">Volume terbesar</option><option value="rvol">RVOL</option></select></label>
+            <button class="refresh-btn" id="refreshBtn" type="button" title="Refresh paparan">↻ <span>Refresh</span></button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-meta"><div><span class="table-indicator"></span><b id="resultCount">0</b> coin dipaparkan <span class="table-info" id="coverageInfo"></span></div><span>15m setup · 1h confirmation</span></div>
+          <div class="table-scroll"><table class="radar-table"><thead><tr><th>COIN / PAIR</th><th>HARGA</th><th>24H %</th><th>VOL 24H</th><th>RVOL</th><th>RSI</th><th>SCORE</th><th>STATUS</th><th></th></tr></thead><tbody id="coinsTable"><tr><td colspan="9" class="table-loading">Menunggu live scan...</td></tr></tbody></table></div>
+          <div id="coinMobileList" class="coin-mobile-list"></div>
+          <div id="emptyState" class="empty-state hidden">Tiada coin padan tapisan semasa. Cuba rendahkan kriteria atau pilih “Semua”.</div>
+        </div>
+      </section>
+      <div class="disclaimer"><span>ⓘ</span><p><strong>Perhatian:</strong> Ini screener peluang, bukan isyarat pasti untung atau bot auto-trade. Signal berdasarkan candle tutup; pergerakan harga dan spread boleh mengubah hasil. Pastikan semak carta & risiko sebelum trade.</p></div>
+    </section>
+
+    <section class="view hidden" id="view-journal">
+      <div class="page-title"><div class="eyebrow">YOUR PAPER TRADES</div><h1>Trading <em>Journal</em></h1><p>Catat posisi secara manual, pantau floating P/L dan kira win rate selepas tutup posisi.</p></div>
+      <div class="journal-note">🔒 Rekod disimpan <strong>dalam browser peranti ini sahaja</strong>. Gunakan Export / Import JSON untuk pindah data antara telefon dan PC. Tiada sync automatik.</div>
+      <div class="journal-stats"><div class="kpi-card"><div class="kpi-label">TOTAL TRADES</div><div class="kpi-value" id="journalTotal">0</div></div><div class="kpi-card"><div class="kpi-label">WIN RATE (CLOSED)</div><div class="kpi-value" id="journalWin">—</div></div><div class="kpi-card"><div class="kpi-label">REALIZED P/L</div><div class="kpi-value" id="journalPnl">$0.00</div></div><div class="kpi-card"><div class="kpi-label">OPEN POSITIONS</div><div class="kpi-value" id="journalOpen">0</div></div></div>
+      <div class="journal-panel"><div class="journal-toolbar"><h2>Trade history</h2><div class="journal-buttons"><button id="exportCsv" class="small-btn">↓ Export CSV</button><button id="exportJson" class="small-btn">↓ Backup JSON</button><label for="importFile" class="small-btn">↑ Import JSON</label><input type="file" id="importFile" accept=".json,application/json" class="hidden" /></div></div><div id="journalRows" class="journal-rows"></div></div>
+    </section>
+
+    <section class="view hidden" id="view-guide">
+      <div class="page-title"><div class="eyebrow">TRADING FRAMEWORK</div><h1>Guide & <em>strategy</em></h1><p>Bagaimana radar menilai peluang dan cara baca signal dengan lebih selamat.</p></div>
+      <div class="guide-grid"><article class="guide-card"><span class="guide-num">01 / TREND</span><h3>Trend 15m + 1h</h3><p>Harga di atas EMA20 &gt; EMA50 &gt; EMA200 pada 15m; pengesahan arah 1h melalui EMA20 &gt; EMA50. Elak melawan trend utama.</p></article><article class="guide-card"><span class="guide-num">02 / MOMENTUM</span><h3>RSI + ADX</h3><p>RSI 53–70, ADX sekurang-kurangnya 18 dan momentum 45 minit positif untuk signal BUY. Terlalu panas? Radar akan kurangkan skor.</p></article><article class="guide-card"><span class="guide-num">03 / VOLUME</span><h3>Relative volume</h3><p>RVOL ≥1.5 berbanding 20 candle sebelumnya. Volum 24h ≥USDT5 juta dan spread ≤0.55% sebagai penapis asas.</p></article><article class="guide-card"><span class="guide-num">04 / BREAKOUT</span><h3>Close di atas high</h3><p>Candle 15 minit terakhir mesti tutup lebih 0.1% di atas high 20 candle sebelumnya. Signal tidak menggunakan candle yang masih berjalan.</p></article><article class="guide-card"><span class="guide-num">05 / RISK</span><h3>TP & SL rujukan</h3><p>TP1 +5%, TP2 +6%, rujukan SL −2% berbanding close candle signal. Ini bukan trailing stop, order sebenar, atau jaminan pulangan.</p></article><article class="guide-card"><span class="guide-num">06 / COVERAGE</span><h3>Market vs shortlist</h3><p>Semua ticker Spot/USDT dipantau berkala. Analisis candle 15m/1h dibuat untuk shortlist dinamik sehingga 52 pasangan setiap pusingan supaya panggilan API terkawal.</p></article></div>
+      <div class="guide-foot"><h3>Definisi label</h3><p><strong class="up">BUY</strong> = semua tapisan ketat dipenuhi pada candle tertutup. <strong class="watch-color">WATCH</strong> = score sekurang-kurangnya 60 dan liquidity memadai, tetapi entry belum sah. <strong>WAIT</strong> = tidak layak atau data candle belum mencukupi. Skor ialah kekuatan kriteria, bukan ramalan pulangan.</p></div>
+    </section>
+    <footer class="footer"><div><strong>DAILY<span>RADAR</span></strong> · V1.0</div><span>Data: KuCoin Public API · Bukan nasihat pelaburan · No auto trading</span></footer>
+  </main>
+</div>
+
+<div id="overlay" class="overlay hidden" aria-hidden="true"></div>
+<aside id="coinDrawer" class="drawer hidden" aria-label="Coin details" role="dialog" aria-modal="true">
+  <div class="drawer-head"><div><div class="eyebrow eyebrow-small">COIN INTELLIGENCE</div><h2 id="drawerSymbol">—</h2></div><button class="close-btn" type="button" id="closeDrawer" aria-label="Tutup">✕</button></div>
+  <div id="drawerBody" class="drawer-body"></div>
+</aside>
+<aside id="settingsDrawer" class="drawer settings-drawer hidden" aria-label="Settings" role="dialog" aria-modal="true">
+  <div class="drawer-head"><div><div class="eyebrow eyebrow-small">YOUR WORKSPACE</div><h2>Tetapan paparan</h2></div><button class="close-btn" type="button" id="closeSettings" aria-label="Tutup">✕</button></div>
+  <div class="drawer-body"><p class="settings-intro">Ini mengubah tapisan yang anda nampak, bukan syarat signal BUY pada server.</p><label class="settings-field">Skor minimum<input type="range" id="settingsScore" min="0" max="90" step="10" value="60"/><span id="settingsScoreValue">60+</span></label><label class="settings-field">Minimum volum 24h (USDT)<select id="settingsVolume"><option value="0">Semua</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option></select></label><div class="settings-note">Candle hanya dikira untuk subset coin paling aktif; tiada data palsu atau signal BUY bila API tidak tersedia.</div><button class="primary-btn" id="saveSettings">Simpan & tutup</button></div>
+</aside>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
