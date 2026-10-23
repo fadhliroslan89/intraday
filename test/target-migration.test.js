@@ -48,6 +48,6 @@ test('Telegram FINAL READY and PWA labels show updated 4–6% target',()=>{
   assert.doesNotMatch(alert,/TP1 \(\+5%/);
   const html=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   assert.match(html,/Daily target <span>4–6/);
-  assert.match(html,/V1\.7\.2/);
+  assert.match(html,/V1\.7\.3/);
   assert.doesNotMatch(html,/Hunt the <em>5–6%/);
 });

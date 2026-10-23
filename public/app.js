@@ -1,5 +1,6 @@
 import {tradePlan} from './trade-math.js';
 import {buildSignalCenter,netTargetGrossPct} from './signal-center-model.js';
+import {diagnoseScan} from './scan-diagnostics.js';
 const $=id=>document.getElementById(id);
 const q=(s,root=document)=>root.querySelector(s);
 const qa=(s,root=document)=>[...root.querySelectorAll(s)];
@@ -92,6 +93,20 @@ function render(){
 function renderSignalCenter(){
   if(!latest)return;
   const model=buildSignalCenter(latest);
+  const diagnostic=diagnoseScan(latest);
+  const elem=$('centerDiagnostics');
+  if(elem){
+    const top=diagnostic.blockers.slice(0,5);
+    const major=top[0];
+    $('diagnosticCaption').textContent=diagnostic.offline ? 'Data belum segar — jangan gunakan signal' :
+      `READY ${diagnostic.finalReady} · BUY aktif ${diagnostic.activeBuy} · ${diagnostic.screenedInSnapshot} candle segar`;
+    $('diagnosticDetail').innerHTML=`<p><b>Cakupan:</b> ${diagnostic.coveragePerScan} coin/pusingan daripada ${diagnostic.totalPairs} pasangan USDT; ${diagnostic.cachedCoins} coin dalam cache dan ${diagnostic.screenedInSnapshot} candle masih segar.</p>
+      <p><b>Tapisan utama:</b> ${diagnostic.activeBuy} BUY rasmi aktif → ${diagnostic.finalReady} FINAL READY. ${diagnostic.timingVeto} calon mengalami risiko false breakout/Anti-FOMO (bukan semestinya BUY).</p>
+      <p><b>Penghalang paling lazim bagi candle segar:</b> ${major?esc(major.label)+' ('+major.failed+'/'+diagnostic.screenedInSnapshot+')':'Tiada bacaan mencukupi'}.</p>
+      <ul>${top.map(x=>`<li>${esc(x.label)}: ${x.failed}/${diagnostic.screenedInSnapshot}</li>`).join('')}</ul>
+      <p><b>Kesegaran:</b> ticker ${diagnostic.tickerAgeMinutes??'—'} min, scan teknikal ${diagnostic.scanAgeMinutes??'—'} min; Telegram ${diagnostic.telegramActive?'aktif':'tidak aktif'}.</p>
+      <small>${esc(diagnostic.note)} 0 READY dalam satu snapshot tidak membuktikan tiada peluang sepanjang hari.</small>`;
+  }
   const filter=centerFilter;
   const search=$('centerSearch').value.trim().toUpperCase();
   const pool=filter==='READY'?model.ready:filter==='WAIT'?model.waiting:filter==='AVOID'?model.avoided:model.active;

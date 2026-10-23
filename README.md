@@ -1,13 +1,17 @@
-# KuCoin Daily Radar 4–6% — Website V1.7.2
+# Diagnostics update V1.7.3
+
+V1.7.3 menambah panel **Kenapa belum FINAL READY?** (dibuka bila perlu) untuk mengenal pasti syarat BUY yang paling kerap tidak lulus dalam snapshot semasa. **BUY, Telegram, TP4/TP6, SQL history dan semua gate lama tidak diubah.** Ini bukan analisis sejarah 24 jam. Baca `DIAGNOSIS-NO-SIGNAL.md`.
+
+# KuCoin Daily Radar 4–6% — Website V1.7.3
 
 Website PC/mobile untuk **pemantauan peluang dan paper trading**, bukan bot order atau jaminan keuntungan 4–6% sehari. Kekalkan URL Render dan repo GitHub `intraday` sedia ada.
 
 
-## Perubahan utama V1.7.2 — Target 4–6%
+## Perubahan utama V1.7.3 — Target 4–6%
 
 TP1: **+4% bersih anggaran**; TP2: **+6% bersih anggaran**. Syarat kelayakan BUY tidak diubah (termasuk 24h range ≥5% untuk signal rasmi). Semua harga TP1 diperbaharui dalam BUY Signal Center, Coin Intelligence, Trading Journal serta Telegram FINAL READY. Simpanan Neon PostgreSQL dan pairing Telegram kekal. Rekod lama TP5 ditanda LEGACY, tidak dikira sebagai TP4.
 
-**Cara update:** Backup jurnal JSON → extract ZIP ini → upload SEMUA isi ke root GitHub `intraday` branch `main` → commit → semak Render Live → refresh app Android / PC sehingga label V1.7.2 muncul. Jangan ubah atau hantar token Telegram/Neon.
+**Cara update:** Backup jurnal JSON → extract ZIP ini → upload SEMUA isi ke root GitHub `intraday` branch `main` → commit → semak Render Live → refresh app Android / PC sehingga label V1.7.3 muncul. Jangan ubah atau hantar token Telegram/Neon.
 
 ## V1.7 — Telegram FINAL READY alert (berasingan daripada notifikasi browser)
 
@@ -111,13 +115,13 @@ npm start
 Tanpa database, log mungkin memberitahu scanner gagal hubungi KuCoin jika akses API di rangkaian tempatan disekat. Dalam keadaan itu website tidak patut menganggap harga/signal offline sebagai live.
 
 
-## Android Install / PWA V1.7.2
+## Android Install / PWA V1.7.3
 
 Daily Radar kini mempunyai `public/manifest.webmanifest`, ikon PNG 192/512px, service worker (`public/sw.js`) dan halaman offline. Selepas deploy GitHub → Render, buka website melalui Chrome di Android, pilih menu tiga titik → **Add to Home screen → Install**, atau klik **Pasang App** apabila butang tersedia. Jika tab masih menunjukkan V1.6/V1.7, deployment belum terkini atau browser masih menyimpan sesi lama.
 
 **Penting:** Service worker tidak menyimpan harga, signal, API atau data dagangan. Ia hanya menyediakan halaman penerangan ketika offline, bukan scanner offline. Telegram masih memerlukan server Render aktif. Tiada APK yang diperlukan. Tidak perlu ubah DATABASE_URL/TELEGRAM_BOT_TOKEN.
 
-## V1.7.2 — Migrasi target TP1 5% → 4%
+## V1.7.3 — Migrasi target TP1 5% → 4%
 
 - TP1 4% **bersih anggaran** selepas kos 0.10% fee + 0.10% slippage setiap sisi; TP2 kekal 6%, SL kekal −2% kasar.
 - **Penapis BUY, scoring, volatility, range 24h ≥5%, dan pemilihan shortlist 52 coin tidak dilonggarkan.**

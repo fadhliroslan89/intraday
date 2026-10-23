@@ -1,6 +1,6 @@
 {
   "name": "kucoin-daily-radar",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "private": true,
   "description": "Responsive KuCoin spot USDT 4-6% daily opportunity radar (monitoring & paper journal, no trade execution)",
   "type": "module",
